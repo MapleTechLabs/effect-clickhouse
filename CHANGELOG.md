@@ -1,10 +1,17 @@
 # Changelog
 
+## 0.1.2 — unreleased
+
+- Preserve `arrayFilter` element types and nullability through selected rows,
+  and reject non-array inputs at compile time.
+- Reject array and boolean timestamp expressions in `windowFunnel` and
+  `sequenceMatch`.
+- Expose unspecified codec representations as `unknown` instead of `any`.
+  Consumers must narrow encoded values before using them; concrete column
+  codecs retain their known wire types.
+
 ## 0.1.1 — unreleased
 
-- Preserve `arrayFilter` element types, reject non-array inputs and invalid
-  funnel/sequence timestamp types, and expose erased codec representations as
-  `unknown` instead of `any`.
 - Include scalar and predicate subqueries in tenant-scope inference, preserving
   scope through expression composition. Handwritten subquery strings are
   conservatively classified as cross-tenant.
