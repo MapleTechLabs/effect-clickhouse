@@ -14,6 +14,10 @@
  * Newlines survive so line-oriented checks still work.
  */
 export function maskLiteralsAndComments(sql: string): string {
+	return maskSql(sql)
+}
+
+const maskSql = (sql: string, markLiterals = false): string => {
 	let out = ""
 	let i = 0
 	const blank = (count: number) => {
@@ -39,7 +43,8 @@ export function maskLiteralsAndComments(sql: string): string {
 		}
 		if (ch === "'" || ch === "`" || ch === '"') {
 			const quote = ch
-			blank(1)
+			if (markLiterals) out += "?"
+			else blank(1)
 			i++
 			while (i < sql.length) {
 				const c = sql[i]
@@ -103,15 +108,24 @@ const clauseIsWellFormed = (kind: Candidate["kind"], segment: string): boolean =
  * hand-written SQL. A trailing semicolon is dropped.
  */
 export function splitTerminalClauses(sql: string): TerminalClauses {
-	const trimmed = sql.replace(/;\s*$/, "")
+	const terminator = /;\s*$/.exec(maskLiteralsAndComments(sql))
+	const trimmed = terminator ? sql.slice(0, terminator.index) + sql.slice(terminator.index + 1) : sql
 	const masked = maskLiteralsAndComments(trimmed)
+	const marked = maskSql(trimmed, true)
 	const depths = depthsOf(masked)
 
 	const candidates: Array<Candidate> = []
 	TERMINAL_KEYWORD_RE.lastIndex = 0
 	let match: RegExpExecArray | null = TERMINAL_KEYWORD_RE.exec(masked)
 	while (match !== null) {
-		if (depths[match.index] === 0) {
+		// A terminal clause follows a complete expression/table, never a place that
+		// still needs an operand. In `SELECT format JSON`, FORMAT is the column.
+		const previous = /([a-zA-Z_]\w*|[^\s])\s*$/.exec(marked.slice(0, match.index))?.[1]
+		const expectsOperand =
+			previous === undefined ||
+			/^(?:SELECT|DISTINCT|ALL|AS|FROM|JOIN|BY|WHERE|PREWHERE|HAVING|QUALIFY|ON|AND|OR|NOT|WHEN|THEN|ELSE|WITH|IN|BETWEEN|LIKE|ILIKE|LIMIT|OFFSET)$/i.test(previous) ||
+			/^[,.+*/%<>=!|&^(-]$/.test(previous)
+		if (depths[match.index] === 0 && !expectsOperand) {
 			candidates.push({
 				start: match.index,
 				kind: match[1].toLowerCase() === "format" ? "format" : "settings",

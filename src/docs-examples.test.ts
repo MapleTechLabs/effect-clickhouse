@@ -70,9 +70,9 @@ describe("README.md", () => {
 		const compiled = compileCHUnsafe(query, { orgId: "org_123", startTime: "2026-01-01 00:00:00" })
 
 		expect(oneLine(compiled.sql)).toBe(
-			"SELECT Name AS name, quantile(0.95)(DurationMs) AS p95, count() AS count " +
-				"FROM events WHERE OrgId = 'org_123' AND Timestamp >= '2026-01-01 00:00:00' " +
-				"AND Name LIKE 'checkout%' GROUP BY name ORDER BY count DESC LIMIT 50",
+			"SELECT events.Name AS name, quantile(0.95)(events.DurationMs) AS p95, count() AS count " +
+				"FROM events WHERE events.OrgId = 'org_123' AND events.Timestamp >= '2026-01-01 00:00:00' " +
+				"AND events.Name LIKE 'checkout%' GROUP BY name ORDER BY count DESC LIMIT 50",
 		)
 		expect(compiled.tenantScope).toBe("single-tenant")
 	})
@@ -107,7 +107,7 @@ describe("README.md", () => {
 			.select(($) => ({ bucket: toStartOfFiveMinute($.Timestamp) }))
 			.where(($) => [$.OrgId.eq("org_123")])
 
-		expect(oneLine(compileCHUnsafe(query, {}).sql)).toContain("toStartOfFiveMinute(Timestamp) AS bucket")
+		expect(oneLine(compileCHUnsafe(query, {}).sql)).toContain("toStartOfFiveMinute(events.Timestamp) AS bucket")
 	})
 })
 
@@ -135,8 +135,8 @@ describe("docs/getting-started.md", () => {
 		})
 
 		expect(oneLine(compiled.sql)).toBe(
-			"SELECT Name AS name, quantile(0.95)(DurationMs) AS p95, count() AS count " +
-				"FROM events WHERE OrgId = 'org_123' AND Timestamp >= '2026-01-01 00:00:00' " +
+			"SELECT events.Name AS name, quantile(0.95)(events.DurationMs) AS p95, count() AS count " +
+				"FROM events WHERE events.OrgId = 'org_123' AND events.Timestamp >= '2026-01-01 00:00:00' " +
 				"GROUP BY name ORDER BY count DESC LIMIT 50",
 		)
 		expect(compiled.tenantScope).toBe("single-tenant")
@@ -169,7 +169,7 @@ describe("docs/tables-and-types.md", () => {
 			.where(($) => [$.OrgId.eq("org_123")])
 
 		expect(oneLine(compileCHUnsafe(query, {}).sql)).toBe(
-			"SELECT Attributes['http.method'] AS method FROM events WHERE OrgId = 'org_123'",
+			"SELECT events.Attributes['http.method'] AS method FROM events WHERE events.OrgId = 'org_123'",
 		)
 	})
 
@@ -188,7 +188,7 @@ describe("docs/tables-and-types.md", () => {
 			.where(($) => [$.OrgId.eq("org_123"), $.Live.eq(true)])
 
 		expect(oneLine(compileCHUnsafe(query, {}).sql)).toBe(
-			"SELECT Hits AS hits FROM counters WHERE OrgId = 'org_123' AND Live = 1",
+			"SELECT counters.Hits AS hits FROM counters WHERE counters.OrgId = 'org_123' AND counters.Live = 1",
 		)
 	})
 })
@@ -201,7 +201,7 @@ describe("docs/queries.md", () => {
 
 		// Each column is aliased to itself, so output keys match column names.
 		expect(oneLine(compileCHUnsafe(query, {}).sql)).toBe(
-			"SELECT Name AS Name, DurationMs AS DurationMs FROM events",
+			"SELECT events.Name AS Name, events.DurationMs AS DurationMs FROM events",
 		)
 	})
 
@@ -261,19 +261,19 @@ describe("docs/expressions.md", () => {
 				{},
 			)
 			expect(oneLine(guarded.sql)).toContain(
-				"ifNull(ifNotFinite(count() / sum(DurationMs), 0), 0) AS perMs",
+				"ifNull(ifNotFinite(count() / sum(events.DurationMs), 0), 0) AS perMs",
 			)
 			// The guard is in the SQL, so the column is a number again.
 			expect(Exit.isFailure(yield* Effect.exit(guarded.decodeRows([{ perMs: null }])))).toBe(true)
 
-			// The other operators cannot manufacture a null from finite operands.
+			// Arithmetic can overflow finite inputs; ClickHouse emits JSON null.
 			const added = compileCHUnsafe(
 				CH.from(Events)
 					.select(($) => ({ total: CH.count().add(CH.sum($.DurationMs)) }))
 					.where(($) => [$.OrgId.eq("org_123")]),
 				{},
 			)
-			expect(Exit.isFailure(yield* Effect.exit(added.decodeRows([{ total: null }])))).toBe(true)
+			expect(Exit.isSuccess(yield* Effect.exit(added.decodeRows([{ total: null }])))).toBe(true)
 		}),
 	)
 
@@ -284,11 +284,11 @@ describe("docs/expressions.md", () => {
 				.where(($) => [$.OrgId.eq("org_123"), CH.when(nameFilter, (n) => $.Name.eq(n))])
 
 		expect(oneLine(compileCHUnsafe(build("checkout"), {}).sql)).toBe(
-			"SELECT Name AS name FROM events WHERE OrgId = 'org_123' AND Name = 'checkout'",
+			"SELECT events.Name AS name FROM events WHERE events.OrgId = 'org_123' AND events.Name = 'checkout'",
 		)
 		// `undefined` drops the predicate entirely rather than emitting `AND true`.
 		expect(oneLine(compileCHUnsafe(build(), {}).sql)).toBe(
-			"SELECT Name AS name FROM events WHERE OrgId = 'org_123'",
+			"SELECT events.Name AS name FROM events WHERE events.OrgId = 'org_123'",
 		)
 	})
 
@@ -306,7 +306,7 @@ describe("docs/expressions.md", () => {
 			.select(($) => ({ name: $.Name }))
 			.where(($) => [$.OrgId.eq("org_123"), $.Name.eq("checkout").or($.Name.eq("cart"))])
 
-		expect(oneLine(compileCHUnsafe(query, {}).sql)).toContain("AND (Name = 'checkout' OR Name = 'cart')")
+		expect(oneLine(compileCHUnsafe(query, {}).sql)).toContain("AND (events.Name = 'checkout' OR events.Name = 'cart')")
 	})
 
 	it("Conditional aggregation", () => {
@@ -318,7 +318,7 @@ describe("docs/expressions.md", () => {
 			.where(($) => [$.OrgId.eq("org_123")])
 
 		expect(oneLine(compileCHUnsafe(query, {}).sql)).toContain(
-			"count() AS total, countIf(DurationMs > 1000) AS slow",
+			"count() AS total, countIf(events.DurationMs > 1000) AS slow",
 		)
 	})
 })
@@ -397,8 +397,8 @@ describe("docs/joins-and-subqueries.md", () => {
 			.groupBy("name")
 
 		expect(oneLine(compileCHUnsafe(outer, {}).sql)).toBe(
-			"SELECT name AS name, max(ms) AS worst FROM (SELECT Name AS name, DurationMs AS ms " +
-				"FROM events WHERE OrgId = 'org_123') AS sub GROUP BY name",
+			"SELECT sub.name AS name, max(sub.ms) AS worst FROM (SELECT events.Name AS name, events.DurationMs AS ms " +
+				"FROM events WHERE events.OrgId = 'org_123') AS sub GROUP BY name",
 		)
 	})
 
@@ -413,8 +413,8 @@ describe("docs/joins-and-subqueries.md", () => {
 			.where(($) => [$.OrgId.eq("org_123")])
 
 		expect(oneLine(compileCHUnsafe(query, {}).sql)).toContain(
-			"INNER JOIN (SELECT Name AS name, Team AS team FROM services " +
-				"WHERE OrgId = 'org_123') AS s ON e.Name = s.name",
+			"INNER JOIN (SELECT services.Name AS name, services.Team AS team FROM services " +
+				"WHERE services.OrgId = 'org_123') AS s ON e.Name = s.name",
 		)
 		expect(compileCHUnsafe(query, {}).tenantScope).toBe("single-tenant")
 	})
@@ -443,7 +443,7 @@ describe("docs/joins-and-subqueries.md", () => {
 			.where(($) => [$.OrgId.eq(CH.param.string("orgId")), CH.notInSubquery($.Team, excluded)])
 
 		const sql = oneLine(compileCHUnsafe(query, { orgId: "org_123" }).sql)
-		expect(sql).toContain("Team NOT IN (SELECT Name AS n FROM events WHERE OrgId = 'org_123')")
+		expect(sql).toContain("s.Team NOT IN (SELECT events.Name AS n FROM events WHERE events.OrgId = 'org_123')")
 		expect(sql).not.toContain("__PARAM_")
 	})
 
@@ -521,8 +521,8 @@ describe("docs/unions-and-ctes.md", () => {
 
 		const compiled = compileCHUnsafe(query, {})
 		expect(oneLine(compiled.sql)).toBe(
-			"WITH recent AS ( SELECT Name AS Name FROM events WHERE OrgId = 'org_123' ) " +
-				"SELECT Name AS name FROM recent",
+			"WITH recent AS ( SELECT events.Name AS Name FROM events WHERE events.OrgId = 'org_123' ) " +
+				"SELECT recent.Name AS name FROM recent",
 		)
 		// Derived off the CTE — the outer query has no OrgId predicate of its own.
 		expect(compiled.tenantScope).toBe("single-tenant")
@@ -777,7 +777,7 @@ describe("docs/reference.md", () => {
 			.where(($) => [$.OrgId.eq("org_123")])
 
 		expect(oneLine(compileCHUnsafe(query, {}).sql)).toContain(
-			"lagInFrame(DurationMs, 1, 0) OVER (PARTITION BY Name ORDER BY Timestamp ASC " +
+			"lagInFrame(events.DurationMs, 1, 0) OVER (PARTITION BY events.Name ORDER BY events.Timestamp ASC " +
 				"ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS previous",
 		)
 	})
@@ -796,7 +796,7 @@ describe("docs/extending.md", () => {
 			.select(($) => ({ bucket: toStartOfFiveMinute($.Timestamp) }))
 			.where(($) => [$.OrgId.eq("org_123")])
 
-		expect(oneLine(compileCHUnsafe(query, {}).sql)).toContain("toStartOfFiveMinute(Timestamp) AS bucket")
+		expect(oneLine(compileCHUnsafe(query, {}).sql)).toContain("toStartOfFiveMinute(events.Timestamp) AS bucket")
 	})
 
 	// docs/extending.md > "Results that depend on the arguments"
@@ -813,7 +813,7 @@ describe("docs/extending.md", () => {
 		// `anyLast` declared no type of its own, and the query still decodes:
 		// the rule says the result is whatever `Name` is.
 		expect(compiled.rowSchemaSource).toBe("derived")
-		expect(oneLine(compiled.sql)).toContain("anyLast(Name) AS last")
+		expect(oneLine(compiled.sql)).toContain("anyLast(events.Name) AS last")
 	})
 
 	it("defineCondFn declares a predicate", () => {
@@ -823,7 +823,7 @@ describe("docs/extending.md", () => {
 			.select(($) => ({ name: $.Name }))
 			.where(($) => [$.OrgId.eq("org_123"), matchesRegex($.Name, "^checkout")])
 
-		expect(oneLine(compileCHUnsafe(query, {}).sql)).toContain("match(Name, '^checkout')")
+		expect(oneLine(compileCHUnsafe(query, {}).sql)).toContain("match(events.Name, '^checkout')")
 	})
 
 	it("rawExpr and rawCond are the last resort", () => {
@@ -843,7 +843,7 @@ describe("docs/extending.md", () => {
 			.select(($) => ({ worst: greatestOf($.DurationMs, CH.lit(100)) }))
 			.where(($) => [$.OrgId.eq("org_123")])
 
-		expect(oneLine(compileCHUnsafe(query, {}).sql)).toContain("greatest(DurationMs, 100) AS worst")
+		expect(oneLine(compileCHUnsafe(query, {}).sql)).toContain("greatest(events.DurationMs, 100) AS worst")
 	})
 
 	it("makeExpr builds custom call syntax", () => {
@@ -857,7 +857,7 @@ describe("docs/extending.md", () => {
 			.select(($) => ({ p99: quantileExact(0.99)($.DurationMs) }))
 			.where(($) => [$.OrgId.eq("org_123")])
 
-		expect(oneLine(compileCHUnsafe(query, {}).sql)).toContain("quantileExact(0.99)(DurationMs) AS p99")
+		expect(oneLine(compileCHUnsafe(query, {}).sql)).toContain("quantileExact(0.99)(events.DurationMs) AS p99")
 	})
 
 	it.effect("rawCompiledQuery wraps handwritten SQL", () =>

@@ -84,3 +84,10 @@ describe("ClickHouseStatementFromString", () => {
 		expect(statement.format).toBeUndefined()
 	})
 })
+
+
+it("replaces a format before a semicolon and trailing comment", () => {
+	const statement = parseStatement("SELECT 1 FORMAT JSONEachRow; -- tail")
+	expect(statement.body).toBe("SELECT 1")
+	expect(withFormat(statement, "FORMAT CSV").text).toBe("SELECT 1\nFORMAT CSV")
+})

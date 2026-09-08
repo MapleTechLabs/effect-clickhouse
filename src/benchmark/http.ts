@@ -2,8 +2,9 @@ import { createHash, randomUUID } from "node:crypto"
 import { Clock, Config, Effect, Redacted, Schema } from "effect"
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http"
 import { escapeClickHouseString } from "../sql/index"
-import { BenchmarkError, canonicalJson, metricNumber, type RunOutput } from "./model"
+import { BenchmarkError, metricNumber, type RunOutput } from "./model"
 import type { BenchmarkTransport, LogMetrics } from "./runner"
+import { canonicalResultRows } from "./result-json"
 
 export interface HttpConfig {
 	readonly url: string
@@ -205,10 +206,16 @@ export const makeHttpTransport = (
 						).pipe(Effect.orElseSucceed(() => ({})))
 			let resultHash: string | undefined
 			if (results !== "skip" && (results !== undefined || options.verifyResults)) {
-				const rows = yield* decodeJsonLines(response.body)
-				const canonical = rows.map(canonicalJson)
+				const canonical = yield* Effect.try({
+					try: () => canonicalResultRows(response.body),
+					catch: () =>
+						new BenchmarkError({
+							queryId: response.queryId,
+							message: "ClickHouse returned invalid JSONEachRow results.",
+						}),
+				})
 				if ((results ?? options.resultOrder) === "unordered") canonical.sort()
-				resultHash = createHash("sha256").update(canonical.join("\n")).digest("hex")
+				resultHash = `json-exact-v1:${createHash("sha256").update(canonical.join("\n")).digest("hex")}`
 			}
 			return { queryId: response.queryId, wallMs: response.wallMs, summary, resultHash }
 		}),

@@ -159,9 +159,7 @@ export const CHDateTimeSecondsLiteral: Schema.Codec<string, string> = Schema.Str
 	Schema.decodeTo(Schema.String, {
 		decode: SchemaGetter.transform((value: string) => value),
 		encode: SchemaGetter.transform((value: string) => {
-			const trimmed = value.trim()
-			const dot = trimmed.indexOf(".")
-			return dot === -1 ? trimmed : trimmed.slice(0, dot)
+			return chDateTimeLiteral(DateTime.makeUnsafe(chDateTimeToIso(value)))
 		}),
 	}),
 )

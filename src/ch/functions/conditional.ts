@@ -2,7 +2,7 @@ import { makeExpr, toFragment } from "../expr"
 import { compile, lazy } from "../../sql/sql-fragment"
 import type { Expr, Condition } from "../expr"
 import { Schema } from "effect"
-import { compileTypedFnCall, defineFn, firstTypedNonNull, numericResultSchema, schemaOf } from "../define-fn"
+import { compileTypedFnCall, defineFn, firstTypedNonNull, mergeResultSchemas, numericResultSchema, schemaOf } from "../define-fn"
 
 // if / multiIf (handwritten — standard fn shape but special arg types)
 
@@ -78,10 +78,5 @@ export function ifNotFinite<N extends number | null>(
 }
 
 function branchSchema<T>(...exprs: Expr<T>[]): Schema.Codec<T, any> | undefined {
-	const schemas: Schema.Codec<T, any>[] = []
-	for (const expr of exprs) {
-		if (!expr.schema) return undefined
-		if (!schemas.includes(expr.schema)) schemas.push(expr.schema)
-	}
-	return schemas.length === 1 ? schemas[0] : Schema.Union(schemas)
+	return mergeResultSchemas(exprs.map((expr) => expr.schema))
 }

@@ -205,7 +205,7 @@ const joinedSub = CH.from(Users)
 type JoinedSubOutput = InferQueryOutput<typeof joinedSub>
 expectTypeOf<JoinedSubOutput>().toEqualTypeOf<{
 	readonly name: string
-	readonly total: number
+	readonly total: number | null
 }>()
 
 // leftJoinQuery — nullable subquery join

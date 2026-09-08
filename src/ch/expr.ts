@@ -80,15 +80,15 @@ export interface Expr<TSType> {
 	mul<R extends number | null>(
 		this: Expr<number | null>,
 		n: R | Expr<R>,
-	): Expr<number | Extract<TSType | R, null>>
+	): Expr<number | null>
 	add<R extends number | null>(
 		this: Expr<number | null>,
 		n: R | Expr<R>,
-	): Expr<number | Extract<TSType | R, null>>
+	): Expr<number | null>
 	sub<R extends number | null>(
 		this: Expr<number | null>,
 		n: R | Expr<R>,
-	): Expr<number | Extract<TSType | R, null>>
+	): Expr<number | null>
 	mod<R extends number | null>(this: Expr<number | null>, n: R | Expr<R>): Expr<Quotient<TSType, R>>
 }
 
@@ -184,6 +184,7 @@ const arith = <Result>(
 	// keeps the strict codec — the same rule `Quotient` applies to the type.
 	const safeDivisor = typeof rhs === "number" && Number.isFinite(rhs) && Math.abs(rhs) >= 1
 	const nullable =
+		op === "+" || op === "-" || op === "*" ||
 		((op === "/" || op === "%") && !safeDivisor) ||
 		rhs === null ||
 		acceptsNull(lhsSchema) ||
@@ -259,11 +260,11 @@ export function makeExpr<T>(
 		// wire form either backend can send.
 		div: <R extends number | null>(n: R | Expr<R>) => arith<Quotient<T, R>>(fragment, "/", n, schema),
 		mul: <R extends number | null>(n: R | Expr<R>) =>
-			arith<number | Extract<T | R, null>>(fragment, "*", n, schema),
+			arith<number | null>(fragment, "*", n, schema),
 		add: <R extends number | null>(n: R | Expr<R>) =>
-			arith<number | Extract<T | R, null>>(fragment, "+", n, schema),
+			arith<number | null>(fragment, "+", n, schema),
 		sub: <R extends number | null>(n: R | Expr<R>) =>
-			arith<number | Extract<T | R, null>>(fragment, "-", n, schema),
+			arith<number | null>(fragment, "-", n, schema),
 		mod: <R extends number | null>(n: R | Expr<R>) => arith<Quotient<T, R>>(fragment, "%", n, schema),
 	}
 	return self
@@ -283,6 +284,10 @@ export function makeUntypedExpr<T = unknown>(
 ): Expr<T> {
 	return makeExpr<T>(fragment, undefined, literal)
 }
+
+// Retain column descriptors through direct projections into derived sources.
+const columnTypes = new WeakMap<Expr<any>, CHType<string, any, any>>()
+export const columnTypeOf = (expr: Expr<any>): CHType<string, any, any> | undefined => columnTypes.get(expr)
 
 // ColumnRef implementation
 
@@ -314,6 +319,7 @@ export function makeColumnRef<Name extends string, ColType extends CHType<string
 			? undefined
 			: (value) => raw(encodeColumnLiteral(columnType, value, columnName ?? name)),
 	)
+	if (columnType !== undefined) columnTypes.set(base, columnType)
 	const isTenantColumn = tenantColumn !== undefined && (columnName ?? name) === tenantColumn
 	const baseEq = base.eq
 	const baseIn = base.in_

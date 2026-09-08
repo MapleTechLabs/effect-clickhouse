@@ -129,12 +129,15 @@ inline settings, preserving other settings. Queries use server-side `readonly=2`
 the tool does not seed data, create tables, flush global caches or deploy changes.
 
 `results: "unordered"` hashes canonical JSON rows, retaining duplicates and ignoring
-row order. `"ordered"` also checks order. `"skip"` explicitly skips verification.
+row order. Numeric tokens are normalized without JavaScript number conversion, so
+Decimal and unquoted large integer precision is retained. `"ordered"` also checks order. `"skip"` explicitly skips verification.
 Without a per-case mode, `--verify-results` and `--result-order` apply. Exact hashes
 can differ for approximate aggregates, floating point changes, nondeterministic
 ordering, or concurrent ingestion. Use domain parity tests when exact equality is
 not appropriate. The comparison separately reports correctness as `verified`,
-`different-or-unstable`, or `not-fully-verified`.
+`different-or-unstable`, or `not-fully-verified`. Exact hashes carry the
+`json-exact-v1:` prefix; regenerate both baseline and candidate when comparing
+against artifacts made before lossless result hashing was introduced.
 
 | Verdict        | Exit | Meaning                                                                              |
 | -------------- | ---- | ------------------------------------------------------------------------------------ |

@@ -709,15 +709,14 @@ describe("arithmetic decoding", () => {
 				{},
 			)
 
-			expect(compiled.sql).toContain("ifNull(ifNotFinite(sum(Hits) / sum(Total), 0), 0) AS rate")
+			expect(compiled.sql).toContain("ifNull(ifNotFinite(sum(events.Hits) / sum(events.Total), 0), 0) AS rate")
 			const exit = yield* Effect.exit(compiled.decodeRows([{ rate: null }]))
 			expect(Exit.isFailure(exit)).toBe(true)
 		}),
 	)
 
-	// Addition cannot manufacture a null out of two finite operands, so it stays
-	// strict — the looseness is bought only where it is paid for.
-	it.effect("addition stays strict", () =>
+	// Finite inputs can overflow; ClickHouse serializes the result as JSON null.
+	it.effect("addition accepts JSON null from overflow", () =>
 		Effect.gen(function* () {
 			const compiled = compileCHUnsafe(
 				CH.from(Events)
@@ -727,7 +726,7 @@ describe("arithmetic decoding", () => {
 			)
 
 			const exit = yield* Effect.exit(compiled.decodeRows([{ total: null }]))
-			expect(Exit.isFailure(exit)).toBe(true)
+			expect(Exit.isSuccess(exit)).toBe(true)
 		}),
 	)
 })

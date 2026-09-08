@@ -108,3 +108,33 @@ describe("splitTerminalClauses", () => {
 		})
 	})
 })
+
+
+describe("terminal clause identifier boundaries", () => {
+	it.each([
+		"WITH 1 AS format SELECT format JSON",
+		"WITH 1 AS format SELECT DISTINCT format JSON",
+		"WITH 1 AS format SELECT 1 + format JSON",
+		"WITH 1 AS format SELECT 2, format JSON",
+		"SELECT t.format JSON FROM t",
+		"SELECT * FROM format JSON",
+	])("preserves an identifier with an implicit alias: %s", (sql) => {
+		expect(splitTerminalClauses(sql).body).toBe(sql)
+		expect(splitTerminalClauses(sql).format).toBeUndefined()
+	})
+	it.each([
+		"SELECT 'a' /* note */ FORMAT JSON",
+		"SELECT `a` FORMAT JSON",
+		"WITH 1 AS format SELECT format JSON FORMAT JSONEachRow",
+	])("still splits a real clause after expressions: %s", (sql) => {
+		expect(splitTerminalClauses(sql).format).toMatch(/^FORMAT JSON/)
+	})
+	it("drops a terminator before trailing comments without dropping the comments", () => {
+		expect(splitTerminalClauses("SELECT 1 FORMAT JSON; -- note\n/* tail */")).toEqual({
+			body: "SELECT 1",
+			settings: undefined,
+			format: "FORMAT JSON -- note\n/* tail */",
+		})
+		expect(splitTerminalClauses("SELECT ';' AS x; -- note").body).toBe("SELECT ';' AS x -- note")
+	})
+})

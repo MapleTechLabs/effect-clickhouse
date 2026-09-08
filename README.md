@@ -89,19 +89,24 @@ Run the SQL with your own ClickHouse client, then hand the rows back to
 a `Schema`, so the SELECT already describes its own rows:
 
 ```ts
+import { ClickhouseClient } from "@effect/sql-clickhouse"
 import { Effect } from "effect"
 
-const compiled = CH.compileUnsafe(query, { orgId: "org_123", startTime: "2026-01-01 00:00:00" })
-
-compiled.rowSchemaSource // "derived"
-const result = await client.query({ query: compiled.sql, format: "JSONEachRow" })
-const rows = await Effect.runPromise(compiled.decodeRows(await result.json()))
-// -> ReadonlyArray<{ name: string; p95: number | null; count: number }>
+const program = Effect.gen(function* () {
+	const client = yield* ClickhouseClient.ClickhouseClient
+	const compiled = yield* CH.compile(query, {
+		orgId: "org_123",
+		startTime: "2026-01-01 00:00:00",
+	})
+	compiled.rowSchemaSource // "derived"
+	const wire = yield* client.unsafe<Record<string, unknown>>(compiled.sql)
+	return yield* compiled.decodeRows(wire)
+	// -> ReadonlyArray<{ name: string; p95: number | null; count: number }>
+})
 ```
 
-`client` is your own ClickHouse client — the builder brings none.
-[Running a query](./docs/running-queries.md) has the full loop and the wire settings that go
-with it.
+Provide Effect's `ClickhouseClient` layer when running `program`; the builder brings no client.
+[Running a query](./docs/running-queries.md) has the complete setup, resource lifetime, and wire settings.
 
 `count()` is a `UInt64`, which ClickHouse's `FORMAT JSON` quotes and a gateway with
 `output_format_json_quote_64bit_integers=0` does not — the

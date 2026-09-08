@@ -4,12 +4,17 @@ The builder does not execute anything. You run `compiled.sql` with your own clie
 rows back:
 
 ```ts
+import { ClickhouseClient } from "@effect/sql-clickhouse"
 import { Effect } from "effect"
 
-const result = await client.query({ query: compiled.sql, format: "JSONEachRow" })
-const rows = await Effect.runPromise(compiled.decodeRows(await result.json()))
+const program = Effect.gen(function* () {
+	const client = yield* ClickhouseClient.ClickhouseClient
+	const wire = yield* client.unsafe<Record<string, unknown>>(compiled.sql)
+	return yield* compiled.decodeRows(wire)
+})
 ```
 
+Provide the `ClickhouseClient` layer at the application boundary.
 [Running a query](./running-queries.md) has the whole loop, including formats and numeric precision.
 
 ## The row schema is derived from the SELECT

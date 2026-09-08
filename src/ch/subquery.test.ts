@@ -171,7 +171,7 @@ describe("having", () => {
 			{ orgId: "org_1" },
 		)
 
-		expect(compiled.sql).toContain("HAVING OrgId = 'org_1'")
+		expect(compiled.sql).toContain("HAVING events.OrgId = 'org_1'")
 		expect(compiled.tenantScope).toBe("cross-tenant")
 	})
 })
@@ -185,7 +185,7 @@ describe("Expr.mod", () => {
 			{ orgId: "org_1" },
 		)
 
-		expect(sql).toContain("cityHash64(TraceId) % 16 = 0")
+		expect(sql).toContain("cityHash64(events.TraceId) % 16 = 0")
 	})
 })
 

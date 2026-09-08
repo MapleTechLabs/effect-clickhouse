@@ -124,7 +124,11 @@ control: value escaping is not an allowlist for identifiers.
 
 ## Arithmetic
 
-`Expr<number>` carries `.add()`, `.sub()`, `.mul()`, `.div()`.
+`Expr<number>` carries `.add()`, `.sub()`, `.mul()`, `.div()`. Addition, subtraction, and
+multiplication return `Expr<number | null>` because finite floating-point inputs can overflow
+and ClickHouse encodes non-finite results as JSON `null`. `sum`, `sumIf`, and
+`toFloat64OrZero` can produce the same wire value; use `ifNotFinite` and `ifNull` when a
+numeric fallback is required.
 
 > **These do not parenthesise.** Chaining follows SQL operator precedence, not call order:
 >

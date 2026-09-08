@@ -68,6 +68,10 @@ Declaring a column that is not actually a tenant key will mark queries as scoped
 not — the builder takes the declaration at face value. Know which case you are in before building
 an authorization decision on top of this.
 
+Source-column references are qualified in generated SQL, including queries without joins.
+This prevents a SELECT alias such as `OrgId` from replacing the source tenant column in
+ClickHouse's alias resolution. A computed output alias never supplies tenant evidence.
+
 ## Only `eq` and `in_` count
 
 ```ts

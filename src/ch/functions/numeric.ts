@@ -4,7 +4,8 @@ import * as T from "../types"
 
 // Type conversion (defineFn one-liners)
 
-export const toFloat64OrZero = defineFn<[Expr<string>], number>("toFloat64OrZero", T.float64)
+// Inf/NaN and overflowing numeric strings parse successfully; JSON writes null.
+export const toFloat64OrZero = defineFn<[Expr<string>], number | null>("toFloat64OrZero", T.nullable(T.float64))
 export const toFloat64 = <N extends number | null>(expr: Expr<N>): Expr<number | Extract<N, null>> =>
 	compileTypedFnCall("toFloat64", numericResultSchema(expr), expr)
 export const toUInt16OrZero = defineFn<[Expr<string>], number>("toUInt16OrZero", T.uint16)

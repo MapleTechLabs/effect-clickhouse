@@ -1,4 +1,5 @@
-import { compileFnCall, compileTypedFnCall, defineFn } from "../define-fn"
+import { acceptsSqlNull, compileFnCall, compileTypedFnCall, defineFn } from "../define-fn"
+import { Schema } from "effect"
 import { makeCond } from "../expr"
 import { compile, str, lazy } from "../../sql/sql-fragment"
 import type { Condition, Expr } from "../expr"
@@ -6,7 +7,12 @@ import * as T from "../types"
 
 // Standard string functions (defineFn one-liners)
 
-export const toString_ = defineFn<[Expr<any>], string>("toString", T.string)
+const stringResult = <A>(name: string, expr: Expr<A>): Expr<string | Extract<A, null>> =>
+	compileTypedFnCall(name,
+		(expr.schema && acceptsSqlNull(expr.schema) ? Schema.NullOr(T.string.schema) : T.string.schema) as Schema.Codec<string | Extract<A, null>, any>,
+		expr)
+
+export const toString_ = <A>(expr: Expr<A>): Expr<string | Extract<A, null>> => stringResult("toString", expr)
 export const length_ = defineFn<[Expr<string>], number>("length", T.uint64)
 export const lower_ = defineFn<[Expr<string>], string>("lower", T.string)
 export const positionCaseInsensitive = defineFn<[Expr<string>, Expr<string>], number>(
@@ -26,7 +32,7 @@ export const left_ = defineFn<[Expr<string>, Expr<number>], string>("left", T.st
 
 /** `hex(x)` — the hex rendering of any value's bytes, as a String. The usual
  *  reason to reach for it is making a hash printable. */
-export const hex = defineFn<[Expr<any>], string>("hex", T.string)
+export const hex = <A>(expr: Expr<A>): Expr<string | Extract<A, null>> => stringResult("hex", expr)
 
 export const domain_ = defineFn<[Expr<string>], string>("domain", T.string)
 export const path_ = defineFn<[Expr<string>], string>("path", T.string)

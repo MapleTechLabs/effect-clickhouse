@@ -72,6 +72,16 @@ Use schema checks through `T.custom` when your application needs those constrain
 separately requires a safe integer. A successful decode does not prove an unsafe large number
 retained precision.
 
+Arithmetic and aggregation can overflow even when their inputs are finite. `sum`, `sumIf`,
+and `toFloat64OrZero` therefore return `number | null`: ClickHouse JSON represents infinity
+and NaN as `null`. `toFloat64OrZero` returns zero for an invalid parse, but strings such as
+`Inf`, `NaN`, and `1e400` successfully parse to nonfinite numbers.
+
+When built-in `DateTime` and `DateTime64` codecs are combined by conditionals, arrays, or
+unions, result encoding prefers `DateTime64` and retains milliseconds. This also works
+through nullable and array wrappers. Custom codecs retain their declared encoding behavior;
+provide an explicit result schema when different custom transforms need a particular encoding.
+
 > **Import the namespace.** Every constructor is on the root barrel too, but
 > `import * as T from "@maple-dev/effect-clickhouse/types"` — as above — reads better than
 > `CH.string` and keeps column types visually distinct from the query DSL.

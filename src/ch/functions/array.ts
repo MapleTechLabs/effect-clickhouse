@@ -3,23 +3,13 @@ import { str, compile, lazy } from "../../sql/sql-fragment"
 import type { Condition, Expr } from "../expr"
 import { Schema } from "effect"
 import * as T from "../types"
-import { defineFn, elementOf, sameAs, schemaOf } from "../define-fn"
+import { defineFn, elementOf, elementSchema, mergeResultSchemas, sameAs, schemaOf } from "../define-fn"
 
 // Array constructors (handwritten — bracket syntax, not fn() call)
 
 export function arrayOf<T>(...exprs: Expr<T>[]): Expr<ReadonlyArray<T>> {
 	const args = () => exprs.map((e) => compile(e.toFragment())).join(", ")
-	const schemas = exprs.map((expr) => expr.schema)
-	// Every element contributes to the result type. One unknown element means
-	// the array cannot claim to validate its contents.
-	const typed = schemas.filter((schema): schema is Schema.Codec<T, any> => schema !== undefined)
-	const unique = [...new Set(typed)]
-	const element =
-		typed.length !== schemas.length || unique.length === 0
-			? undefined
-			: unique.length === 1
-				? unique[0]
-				: Schema.Union(unique)
+	const element = mergeResultSchemas(exprs.map((expr) => expr.schema))
 	return makeExpr(lazy(() => `[${args()}]`), element && Schema.Array(element))
 }
 
@@ -64,7 +54,10 @@ export const arrayDistinct = <T>(arr: Expr<ReadonlyArray<T>>): Expr<ReadonlyArra
 	defineFn<ArrayFn<T>, ReadonlyArray<T>>("arrayDistinct", sameAs(0))(arr)
 
 export const arrayPushFront = <T>(arr: Expr<ReadonlyArray<T>>, element: Expr<T>): Expr<ReadonlyArray<T>> =>
-	defineFn<[Expr<ReadonlyArray<T>>, Expr<T>], ReadonlyArray<T>>("arrayPushFront", sameAs(0))(arr, element)
+	defineFn<[Expr<ReadonlyArray<T>>, Expr<T>], ReadonlyArray<T>>("arrayPushFront", (arr, element) => {
+		const item = mergeResultSchemas([elementSchema(arr.schema), element.schema])
+		return item && Schema.Array(item)
+	})(arr, element)
 
 /** `arrayElement(arr, n)` — ClickHouse's 1-indexed subscript. The result is one
  *  element, so it decodes as the array's element type. */

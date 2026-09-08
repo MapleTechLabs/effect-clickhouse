@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.1.1 — unreleased
+
+- Include scalar and predicate subqueries in tenant-scope inference, preserving
+  scope through expression composition. Handwritten subquery strings are
+  conservatively classified as cross-tenant.
+- Derive `arrayOf` codecs from every element, preserving nullable values and
+  leaving arrays with untyped elements unvalidated.
+
+- Qualify source columns to prevent SELECT aliases from changing tenant filters.
+- Preserve column literal codecs through derived sources and evaluate join callbacks
+  during compilation with both sources' codecs.
+- Preserve nullable array insertions, string conversions, conditional fallbacks, and
+  DateTime64 precision when combining built-in result codecs.
+- Decode numeric overflow as JSON `null`; arithmetic, sums, and floating-point string
+  conversion now expose nullable result types where needed.
+- Normalize timezone offsets before flooring DateTime parameters to seconds.
+- Compare benchmark results with lossless numeric hashes. Regenerate saved baselines
+  to use the new `json-exact-v1` hash format.
+- Correct FORMAT-clause detection around identifiers and remove statement terminators
+  followed by comments before rewriting SQL.
+
 ## 0.1.0 — unreleased
 
 First public release.

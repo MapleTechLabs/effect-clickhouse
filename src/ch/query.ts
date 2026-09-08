@@ -76,8 +76,8 @@ interface TypedJoinClause {
 	/** Inner query for subquery joins (compiled lazily at compileCH time). */
 	readonly innerQuery?: CHQuery<any, any, any>
 	readonly alias: string
-	/** ON condition. Omitted for CROSS JOIN. */
-	readonly on?: Condition
+	/** ON callback, evaluated during compilation with source codecs. Omitted for CROSS JOIN. */
+	readonly on?: JoinOnCallback<any, any>
 	/** The joined table's tenant column, if it declared one. */
 	readonly tenantColumn?: string
 	/** The joined table's column definitions, for decoding joined selections. */
@@ -295,6 +295,17 @@ export type InferQueryOutput<Q> =
 			? U
 			: never
 
+/** SQL qualifier shared by SELECT/WHERE and deferred join callbacks. */
+export function sourceAlias(state: CHQueryState): string {
+	if (state.tableAlias !== undefined) return state.tableAlias
+	if (state.fromQueryAlias !== undefined) return state.fromQueryAlias
+	if (/^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$/.test(state.tableName)) return state.tableName
+	const aliases = new Set(state.typedJoins.map((join) => join.alias))
+	let alias = "__ch_source"
+	while (aliases.has(alias)) alias += "_"
+	return alias
+}
+
 // ColumnAccessor factory (Proxy-based)
 
 export function createColumnAccessor<Cols extends ColumnDefs>(
@@ -318,7 +329,7 @@ export function createColumnAccessor<Cols extends ColumnDefs>(
 
 // Qualified ColumnAccessor for joined tables (generates alias.Column SQL)
 
-function createQualifiedColumnAccessor(
+export function createQualifiedColumnAccessor(
 	alias: string,
 	tenantColumn?: string,
 	columns?: ColumnDefs,
@@ -445,11 +456,6 @@ function makeQuery<
 		// Type-safe joins with Table
 
 		innerJoin(table, alias, onFn) {
-			const mainAlias = state.tableAlias ?? state.tableName
-			const mainAccessor = createQualifiedColumnAccessor(mainAlias, state.tenantColumn, state.columns)
-			const joinedAccessor = createQualifiedColumnAccessor(alias, table.tenantColumn, table.columns)
-			const condition = onFn(mainAccessor, joinedAccessor)
-
 			return makeQuery({
 				...state,
 				typedJoins: [
@@ -458,7 +464,7 @@ function makeQuery<
 						type: "INNER",
 						tableName: table.name,
 						alias,
-						on: condition,
+						on: onFn,
 						tenantColumn: table.tenantColumn,
 						columns: table.columns,
 					},
@@ -467,11 +473,6 @@ function makeQuery<
 		},
 
 		leftJoin(table, alias, onFn) {
-			const mainAlias = state.tableAlias ?? state.tableName
-			const mainAccessor = createQualifiedColumnAccessor(mainAlias, state.tenantColumn, state.columns)
-			const joinedAccessor = createQualifiedColumnAccessor(alias, table.tenantColumn, table.columns)
-			const condition = onFn(mainAccessor, joinedAccessor)
-
 			return makeQuery({
 				...state,
 				typedJoins: [
@@ -480,7 +481,7 @@ function makeQuery<
 						type: "LEFT",
 						tableName: table.name,
 						alias,
-						on: condition,
+						on: onFn,
 						tenantColumn: table.tenantColumn,
 						columns: table.columns,
 					},
@@ -507,26 +508,16 @@ function makeQuery<
 		// Type-safe joins with subquery (CHQuery)
 
 		innerJoinQuery(query, alias, onFn) {
-			const mainAlias = state.tableAlias ?? state.fromQueryAlias ?? state.tableName
-			const mainAccessor = createQualifiedColumnAccessor(mainAlias, state.tenantColumn)
-			const joinedAccessor = createQualifiedColumnAccessor(alias, state.tenantColumn)
-			const condition = onFn(mainAccessor, joinedAccessor)
-
 			return makeQuery({
 				...state,
-				typedJoins: [...state.typedJoins, { type: "INNER", innerQuery: query, alias, on: condition }],
+				typedJoins: [...state.typedJoins, { type: "INNER", innerQuery: query, alias, on: onFn }],
 			}) as any
 		},
 
 		leftJoinQuery(query, alias, onFn) {
-			const mainAlias = state.tableAlias ?? state.fromQueryAlias ?? state.tableName
-			const mainAccessor = createQualifiedColumnAccessor(mainAlias, state.tenantColumn)
-			const joinedAccessor = createQualifiedColumnAccessor(alias, state.tenantColumn)
-			const condition = onFn(mainAccessor, joinedAccessor)
-
 			return makeQuery({
 				...state,
-				typedJoins: [...state.typedJoins, { type: "LEFT", innerQuery: query, alias, on: condition }],
+				typedJoins: [...state.typedJoins, { type: "LEFT", innerQuery: query, alias, on: onFn }],
 			}) as any
 		},
 

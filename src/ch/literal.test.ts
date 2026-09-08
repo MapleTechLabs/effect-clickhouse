@@ -36,30 +36,30 @@ const whereSql = (
 describe("literals encode through the column's type", () => {
 	it("writes a Map as ClickHouse's map() rather than [object Object]", () => {
 		expect(whereSql(($) => [$.Attributes.eq({ "http.method": "GET" })])).toBe(
-			"Attributes = map('http.method', 'GET')",
+			"events.Attributes = map('http.method', 'GET')",
 		)
 	})
 
 	it("writes an Array with brackets and quoted elements", () => {
-		expect(whereSql(($) => [$.Tags.eq(["a", "b"])])).toBe("Tags = ['a', 'b']")
-		expect(whereSql(($) => [$.Tags.in_(["a"], ["b"])])).toBe("Tags IN (['a'], ['b'])")
+		expect(whereSql(($) => [$.Tags.eq(["a", "b"])])).toBe("events.Tags = ['a', 'b']")
+		expect(whereSql(($) => [$.Tags.in_(["a"], ["b"])])).toBe("events.Tags IN (['a'], ['b'])")
 	})
 
 	it("writes a Bool as 1/0, which is what ClickHouse compares against", () => {
-		expect(whereSql(($) => [$.Live.eq(true)])).toBe("Live = 1")
-		expect(whereSql(($) => [$.Live.eq(false)])).toBe("Live = 0")
+		expect(whereSql(($) => [$.Live.eq(true)])).toBe("events.Live = 1")
+		expect(whereSql(($) => [$.Live.eq(false)])).toBe("events.Live = 0")
 	})
 
 	it("writes null as NULL", () => {
-		expect(whereSql(($) => [$.Note.eq(null)])).toBe("Note = NULL")
+		expect(whereSql(($) => [$.Note.eq(null)])).toBe("events.Note = NULL")
 	})
 
 	it("escapes strings", () => {
-		expect(whereSql(($) => [$.OrgId.eq("a'b\\c")])).toBe("OrgId = 'a\\'b\\\\c'")
+		expect(whereSql(($) => [$.OrgId.eq("a'b\\c")])).toBe("events.OrgId = 'a\\'b\\\\c'")
 	})
 
 	it("accepts every shape a DateTime comparison is typed to take", () => {
-		const expected = "Timestamp >= '2026-01-01 00:00:00'"
+		const expected = "events.Timestamp >= '2026-01-01 00:00:00'"
 		expect(whereSql(($) => [$.Timestamp.gte("2026-01-01 00:00:00")])).toBe(expected)
 		expect(whereSql(($) => [$.Timestamp.gte(new Date("2026-01-01T00:00:00Z"))])).toBe(expected)
 		expect(whereSql(($) => [$.Timestamp.gte(DateTime.makeUnsafe("2026-01-01T00:00:00Z"))])).toBe(expected)
@@ -165,7 +165,7 @@ describe("param.dateTimeSeconds", () => {
 			spansWhereSql(($) => [$.TimestampTime.gte(CH.param.dateTimeSeconds("startTime"))], {
 				startTime: "2026-01-01 12:30:00.123456789",
 			}),
-		).toBe("TimestampTime >= '2026-01-01 12:30:00'")
+		).toBe("spans.TimestampTime >= '2026-01-01 12:30:00'")
 	})
 
 	it("leaves a bound that is already second-precision alone", () => {
@@ -173,7 +173,7 @@ describe("param.dateTimeSeconds", () => {
 			spansWhereSql(($) => [$.TimestampTime.gte(CH.param.dateTimeSeconds("startTime"))], {
 				startTime: "2026-01-01 12:30:00",
 			}),
-		).toBe("TimestampTime >= '2026-01-01 12:30:00'")
+		).toBe("spans.TimestampTime >= '2026-01-01 12:30:00'")
 	})
 
 	// The point of the kind: one param value, two encodings, in one WHERE.
@@ -186,6 +186,6 @@ describe("param.dateTimeSeconds", () => {
 				],
 				{ startTime: "2026-01-01 12:30:00.500" },
 			)?.replace(/\s+/g, " "),
-		).toBe("TimestampTime >= '2026-01-01 12:30:00' AND Timestamp >= '2026-01-01 12:30:00.500'")
+		).toBe("spans.TimestampTime >= '2026-01-01 12:30:00' AND spans.Timestamp >= '2026-01-01 12:30:00.500'")
 	})
 })

@@ -5,8 +5,8 @@
 // 2. compileFnCall / compileFnCallCond — thin wrappers for generic/variadic functions
 // 3. makeExpr / makeCond (from expr.ts) — escape hatch for custom SQL syntax
 
-import { Result, Schema } from "effect"
-import { CHNumber } from "./types"
+import { Result, Schema, type SchemaAST } from "effect"
+import { CHNumber, dateTime64 } from "./types"
 import { compile, lazy } from "../sql/sql-fragment"
 import type { Expr, Condition } from "./expr"
 import { makeExpr, makeUntypedExpr, makeCond, toFragment } from "./expr"
@@ -41,6 +41,27 @@ export const schemaOfAny = <T>(...exprs: ReadonlyArray<unknown>): Schema.Codec<T
 	}
 	return undefined
 }
+
+/** Combine every possible result, retaining the most precise built-in timestamp encoder. */
+export const mergeResultSchemas = <T>(
+	schemas: ReadonlyArray<Schema.Codec<T, any> | undefined>,
+): Schema.Codec<T, any> | undefined => {
+	if (schemas.length === 0 || schemas.some((schema) => schema === undefined)) return undefined
+	const unique = [...new Set(schemas as ReadonlyArray<Schema.Codec<T, any>>)]
+	// A union encodes through its first matching domain type. DateTime and
+	// DateTime64 share DateTime.Utc, so the seconds encoder must not win over
+	// the millisecond encoder. Nullable/array wrappers retain their member ASTs.
+	const precise = (ast: SchemaAST.AST): boolean =>
+		ast === dateTime64.schema.ast ||
+		(ast._tag === "Union" && ast.types.some(precise)) ||
+		(ast._tag === "Arrays" && ast.rest.some(precise))
+	unique.sort((a, b) => Number(precise(b.ast)) - Number(precise(a.ast)))
+	return unique.length === 1 ? unique[0] : Schema.Union(unique)
+}
+
+/** SQL nullability is a wire property, including for custom transformed codecs. */
+export const acceptsSqlNull = (schema: Schema.Codec<any, any>): boolean =>
+	Result.isSuccess(Schema.decodeUnknownResult(schema)(null))
 
 /**
  * A schema with its `| null` arm removed, or `undefined` when it had none.
@@ -154,8 +175,8 @@ export const firstTyped =
 		schemaOfAny<R>(...args)
 
 /**
- * The result decodes as the first typed argument, minus its `| null` — the rule
- * for `coalesce`/`ifNull`, which return the first argument that is not NULL.
+ * Combine the possible values of `coalesce`/`ifNull` and extrema, excluding
+ * NULL when a known non-nullable argument guarantees a value.
  *
  * ClickHouse types that result non-`Nullable` as soon as one argument is
  * non-`Nullable`, because that argument can always supply a value:
@@ -164,19 +185,20 @@ export const firstTyped =
  * column derive as `string | null`, which is why the queries that use this
  * shape had to hand-declare a row schema to narrow it back.
  *
- * An argument with no schema says nothing about nullability, so it does not
- * license the narrowing.
+ * Every argument contributes its codec, including narrowed custom fallback
+ * types. An unknown argument makes the composition unknown. Test NULL against
+ * the codec itself because a transformed codec need not expose a Union AST.
  */
 export const firstTypedNonNull =
 	<Args extends unknown[], R>() =>
 	(...args: Args): Schema.Codec<R, any> | undefined => {
-		const first = schemaOfAny<R>(...args)
-		if (first === undefined) return undefined
-		const nonNullArg = args.some((arg) => {
-			const schema = schemaOf(arg)
-			return schema !== undefined && withoutNull(schema) === undefined
-		})
-		return nonNullArg ? (withoutNull<R>(first as Schema.Codec<R | null, any>) ?? first) : first
+		const schemas = args.map((arg) => schemaOf<R>(arg))
+		const merged = mergeResultSchemas(schemas)
+		if (!merged) return undefined
+		const nonNullArg = schemas.some((schema) => schema !== undefined && !acceptsSqlNull(schema))
+		return nonNullArg
+			? Schema.Unknown.check(Schema.makeFilter((value) => value !== null)).pipe(Schema.decodeTo(merged))
+			: merged
 	}
 
 /** The result is one element of argument `index`'s array — `arrayJoin`,

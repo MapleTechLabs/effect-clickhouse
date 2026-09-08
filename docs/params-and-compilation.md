@@ -49,6 +49,8 @@ directions cannot drift, because there is only one of them.
 `param.dateTime` and `param.dateTimeString` preserve milliseconds in `Date` and `DateTime.Utc`
 values, as well as fractions already present in strings. Use `param.dateTimeSeconds` for a
 whole-second DateTime bound, or `param.of(T.dateTime, name)` for the parsed UTC flavour.
+`param.dateTimeSeconds` converts zoned strings to UTC before flooring: for example,
+`2026-01-02T00:00:00.500+02:00` becomes `2026-01-01 22:00:00`.
 
 `param.of` keeps each codec distinct even when several types share the same SQL name.
 Reuse type definitions across queries when practical.

@@ -7,15 +7,16 @@
 // 3. Evaluating the whereFn (with params resolved) to get Conditions
 // 4. Assembling into SqlQuery and calling the existing compileQuery()
 
-import type { CHType, ColumnDefs } from "./types"
+import { dateTime, dateTime64, type CHType, type ColumnDefs } from "./types"
 import type { CHQuery, CHQueryState } from "./query"
 import type { CHUnionQuery } from "./union"
-import { createColumnAccessor, createJoinedColumnAccessor } from "./query"
-import { aliased } from "./expr"
+import { createQualifiedColumnAccessor, createJoinedColumnAccessor, sourceAlias } from "./query"
+import { aliased, columnTypeOf } from "./expr"
 import { raw, ident, escapeClickHouseString, compile as compileSqlFragment } from "../sql/sql-fragment"
 import { splitTerminalClauses } from "../sql/terminal-clauses"
 import { compileQuery, type SqlQuery } from "../sql/sql-query"
 import { PARAM_MARKER_PREFIX, PARAM_PLACEHOLDER_PATTERN, paramSchema, type ParamKind } from "./param"
+import { mergeResultSchemas } from "./define-fn"
 import { encodeLiteral } from "./literal"
 import { Effect, Option, Schema } from "effect"
 import { QueryBuilderDefect, QueryBuilderError } from "./errors"
@@ -617,13 +618,11 @@ function compileInner<
 		scope: compiled.tenantScope,
 		bound: tenantBoundOf(compiled),
 	})
-	const mainAlias = state.tableAlias ?? state.fromQueryAlias ?? state.tableName
+	const mainAlias = sourceAlias(state)
 	const mainColumn =
 		state.tenantColumn === undefined
 			? undefined
-			: state.typedJoins.length > 0
-				? `${mainAlias}.${state.tenantColumn}`
-				: state.tenantColumn
+			: `${mainAlias}.${state.tenantColumn}`
 	let fromFragment
 	let fromSource: TenantSource
 	if (state.fromQuery) {
@@ -640,8 +639,8 @@ function compileInner<
 		fromFragment = raw(`(\n${splitTerminalClauses(inner.sql).body}\n) AS ${state.fromQueryAlias}`)
 	} else {
 		fromSource = sourceForTable(state.tableName, mainColumn)
-		fromFragment = state.tableAlias
-			? raw(`${state.tableName} AS ${state.tableAlias}`)
+		fromFragment = mainAlias !== state.tableName
+			? raw(`${state.tableName} AS ${mainAlias}`)
 			: ident(state.tableName)
 	}
 
@@ -682,12 +681,16 @@ function compileInner<
 				throw new QueryBuilderDefect({ message: "TypedJoin: missing table or query" })
 			}
 			sources.push(source)
-			if (j.on) {
+			const on = j.on?.(
+				createQualifiedColumnAccessor(mainAlias, state.tenantColumn, columnsOf(state)),
+				createQualifiedColumnAccessor(j.alias, j.tenantColumn, joinColumnsOf(j)),
+			)
+			if (on) {
 				// A LEFT JOIN's ON clause can constrain only its right side. It
 				// cannot remove unmatched rows from the preserved left side.
 				if (j.type !== "LEFT" || source.column !== undefined) {
 					joinPredicates.push({
-						predicates: tenantPredicatesOf(j.on),
+						predicates: tenantPredicatesOf(on),
 						target: j.type === "LEFT" ? source.column : undefined,
 					})
 				}
@@ -696,7 +699,7 @@ function compileInner<
 				type: j.type,
 				table: tableSql,
 				alias: j.alias,
-				on: j.on ? compileSqlFragment(j.on.toFragment()) : undefined,
+				on: on ? compileSqlFragment(on.toFragment()) : undefined,
 			}
 		})
 
@@ -814,9 +817,9 @@ function deriveTenantScope(
 function makeAccessor(state: CHQueryState): any {
 	const joinAliases = state.typedJoins.map((j) => j.alias)
 	const hasJoins = joinAliases.length > 0
-	if (!hasJoins) return createColumnAccessor(columnsOf(state), state.tenantColumn)
+	if (!hasJoins) return createQualifiedColumnAccessor(sourceAlias(state), state.tenantColumn, columnsOf(state))
 
-	const mainAlias = state.tableAlias ?? state.fromQueryAlias ?? state.tableName
+	const mainAlias = sourceAlias(state)
 	return createJoinedColumnAccessor(
 		columnsOf(state),
 		joinAliases,
@@ -878,13 +881,24 @@ function columnsOf(state: CHQueryState): ColumnDefs {
  * the outer query's reference to it stays untyped rather than being invented.
  */
 function synthesizeColumns(exprs: Record<string, unknown>): ColumnDefs {
-	const synthesized: Record<string, CHType<"Inferred", any, any>> = {}
+	const synthesized: ColumnDefs = {}
 	for (const [alias, expr] of Object.entries(exprs)) {
 		const schema = (expr as { readonly schema?: Schema.Codec<any, any> } | null)?.schema
 		if (schema === undefined) continue
-		synthesized[alias] = { _tag: "Inferred", sql: "", schema, literalSchema: schema }
+		synthesized[alias] = columnTypeOf(expr as import("./expr").Expr<any>) ?? { _tag: "Inferred", sql: "", schema, literalSchema: derivedLiteralSchema(schema) }
 	}
 	return synthesized
+}
+
+/** Built-in DateTime expressions accept the same comparison values as columns. */
+function derivedLiteralSchema(schema: Schema.Codec<any, any>): Schema.Codec<any, any> {
+	if (schema.ast === dateTime.schema.ast) return dateTime.literalSchema
+	if (schema.ast === dateTime64.schema.ast) return dateTime64.literalSchema
+	// Preserve custom outer transformations; only unwrap a plain union.
+	if (schema.ast._tag === "Union" && schema.ast.encoding === undefined) {
+		return Schema.Union(schema.ast.types.map((ast) => derivedLiteralSchema(Schema.make(ast))))
+	}
+	return schema
 }
 
 /** Evaluate a query's SELECT callback without compiling it. */
@@ -949,8 +963,7 @@ const unionExprsOf = (
 	const fields: Record<string, { readonly schema?: Schema.Codec<any, any> }> = {}
 	for (const alias of untyped) fields[alias] = {}
 	for (const [alias, schemas] of perColumn) {
-		const only = schemas.length === 1 ? schemas[0] : undefined
-		if (!untyped.has(alias)) fields[alias] = { schema: only ?? Schema.Union(schemas) }
+		if (!untyped.has(alias)) fields[alias] = { schema: mergeResultSchemas(schemas) }
 	}
 	return fields
 }

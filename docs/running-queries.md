@@ -7,10 +7,11 @@ column types already assume.
 
 ## A complete client example
 
-For Node.js install `@clickhouse/client` separately:
+For Node.js or Bun, install Effect's ClickHouse client separately. Use the same Effect 4
+release as your `effect` dependency; this example is checked against `4.0.0-rc.112`:
 
 ```sh
-npm install @clickhouse/client
+npm install effect@4.0.0-rc.112 @effect/sql-clickhouse@4.0.0-rc.112
 ```
 
 This example reads five rows from ClickHouse's built-in `system.numbers` table. It creates no
@@ -18,50 +19,62 @@ schema and writes no data. Set `CLICKHOUSE_URL`, `CLICKHOUSE_USERNAME`, and
 `CLICKHOUSE_PASSWORD` for your server; the defaults target a local server.
 
 ```ts title="run-query.ts"
-import { createClient } from "@clickhouse/client"
-import { Effect } from "effect"
+import { ClickhouseClient } from "@effect/sql-clickhouse"
+import { Config, Effect, Redacted } from "effect"
 import * as CH from "@maple-dev/effect-clickhouse"
 import * as T from "@maple-dev/effect-clickhouse/types"
 
-const client = createClient({
-	url: process.env.CLICKHOUSE_URL ?? "http://localhost:8123",
-	username: process.env.CLICKHOUSE_USERNAME ?? "default",
-	password: process.env.CLICKHOUSE_PASSWORD ?? "",
+const ClickHouseLive = ClickhouseClient.layerConfig({
+	url: Config.string("CLICKHOUSE_URL").pipe(Config.withDefault("http://localhost:8123")),
+	username: Config.string("CLICKHOUSE_USERNAME").pipe(Config.withDefault("default")),
+	password: Config.redacted("CLICKHOUSE_PASSWORD").pipe(
+		Config.withDefault(Redacted.make("")),
+		Config.map(Redacted.value),
+	),
 })
 
-try {
+const program = Effect.gen(function* () {
+	const client = yield* ClickhouseClient.ClickhouseClient
 	const Numbers = CH.table("system.numbers", { number: T.uint64 })
 	const query = CH.from(Numbers).select("number").limit(5)
-	const compiled = await Effect.runPromise(CH.compile(query, {}))
-	const result = await client.query({
-		query: compiled.sql,
-		format: "JSONEachRow",
-		clickhouse_settings: { max_execution_time: 30 },
-	})
-	const wire = await result.json<Record<string, unknown>>()
-	const rows = await Effect.runPromise(compiled.decodeRows(wire))
-	console.log(rows) // [{ number: 0 }, ..., { number: 4 }]
-} finally {
-	await client.close()
-}
+	const compiled = yield* CH.compile(query, {})
+	const wire = yield* client.unsafe<Record<string, unknown>>(compiled.sql).pipe(
+		client.withClickhouseSettings({ max_execution_time: 30 }),
+	)
+	const rows = yield* compiled.decodeRows(wire)
+	yield* Effect.log(rows) // [{ number: 0 }, ..., { number: 4 }]
+})
+
+Effect.runPromise(program.pipe(Effect.provide(ClickHouseLive)))
 ```
 
 Run it with `bun run-query.ts` or your project's TypeScript runner. A connection failure here
 is a client/server configuration issue; the offline example in [Getting started](./getting-started.md)
 can still compile and decode without a server.
 
-The one-shot script closes the client even on failure. In a long-running Node service, share a
-client and close it during shutdown. The official client uses a connection pool. For Workers or
-other fetch-based runtimes use `@clickhouse/client-web`; follow your runtime's resource lifetime.
-Keep database credentials on your server, rather than shipping them in frontend code.
-See the [official JavaScript client documentation](https://clickhouse.com/docs/integrations/language-clients/js/index).
+`Effect.runPromise` runs once at the script boundary. The client layer owns connection setup
+and cleanup, including failure paths. In a long-running service, provide the layer at the
+application boundary so requests share the client. The driver handles interruption and reports
+SQL failures as `SqlError`.
+
+`client.unsafe(compiled.sql)` executes the SQL string already produced by the builder. It does
+not validate or escape arbitrary SQL; keep untrusted values in `CH.param` bindings. Leave result
+name transforms disabled so aliases still match the compiled decoder.
+
+`@effect/sql-clickhouse` wraps the official Node.js client. For Workers or other fetch-based
+runtimes, use a runtime-compatible adapter such as `@clickhouse/client-web` with an Effect
+integration. Keep database credentials on your server.
+See the [Effect ClickHouse driver source](https://github.com/Effect-TS/effect/blob/main/packages/sql/clickhouse/src/ClickhouseClient.ts).
 
 ## Formats and numeric precision
 
-Pass `format: "JSONEachRow"` to the client and leave `.format()` off the builder query.
-The client's `result.json()` returns an array for this format. For `FORMAT JSON`, the raw HTTP
-response is an envelope with a `data` array; that array, not the whole envelope, is what the
-decoder accepts. Consume each client result body once.
+Leave `.format()` off the builder query. Effect's ClickHouse client requests `FORMAT JSON`
+and unwraps its `data` array, so `yield* client.unsafe<Record<string, unknown>>(compiled.sql)` gives the rows directly.
+There is no separate `result.json()` step.
+
+If you use the official JavaScript client directly, request `format: "JSONEachRow"` and pass
+its parsed row array to the decoder. A raw `FORMAT JSON` response is an envelope: pass its
+`data` array, not the whole envelope. Consume each result body once.
 
 You do not need `output_format_json_quote_64bit_integers: 0` for decoding: the numeric codecs
 accept both quoted and unquoted numbers. Both decode into JavaScript `number`, so **neither
@@ -76,14 +89,13 @@ There are three independent failure stages:
 | Stage                          | What failed                                                     | What to do                                                |
 | ------------------------------ | --------------------------------------------------------------- | --------------------------------------------------------- |
 | `CH.compile`                   | Missing or invalid parameter (`QueryBuilderError`)              | Validate inputs or fix the param bag.                     |
-| `client.query` / `result.json` | Connection, credentials, server SQL error, or response parsing  | Inspect the client error and server query ID.             |
+| `client.unsafe` | Connection, credentials, server SQL error, or response parsing  | Inspect the client error and server query ID.             |
 | `compiled.decodeRows`          | Wire rows disagree with the schema (`CompiledQueryDecodeError`) | Inspect `rowIndex`, aliases, nullability, and wire types. |
 
-`Effect.runPromise` bridges to normal Promise rejection. Inside an Effect application,
-`yield* CH.compile(...)` and `yield* compiled.decodeRows(...)` preserve their typed errors;
-see [handling compilation failures](./params-and-compilation.md#handling-compilation-failures).
-Wrapping the database client in Effect is an application integration choice: preserve the
-client cause in your own typed error and forward cancellation with the client's `abort_signal`.
+Inside the program, compilation, execution, and decoding all use `yield*`, preserving their
+typed errors. Handle them with Effect before the outer `Effect.runPromise` converts unhandled
+failures to Promise rejections. Layer configuration can also fail with `ConfigError`.
+See [handling compilation failures](./params-and-compilation.md#handling-compilation-failures).
 
 `compiled.tenantScope` is metadata, not an execution gate. For tenant-scoped endpoints, check
 it before sending SQL and derive tenant values from authenticated context. A correctly scoped

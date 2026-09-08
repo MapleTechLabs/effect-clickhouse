@@ -21,7 +21,7 @@ describe("expression functions", () => {
 			result: CH.coalesce(CH.nullIf($.Name, ""), CH.lit("default")),
 		}))
 		const { sql } = compileCHUnsafe(q, {})
-		expect(sql).toContain("coalesce(nullIf(Name, ''), 'default') AS result")
+		expect(sql).toContain("coalesce(nullIf(test_table.Name, ''), 'default') AS result")
 	})
 
 	// `coalesce(nullIf(x, ''), y)` is a `String` to ClickHouse, not a
@@ -49,7 +49,7 @@ describe("expression functions", () => {
 	it("compiles nullIf", () => {
 		const q = CH.from(TestTable).select(($) => ({ result: CH.nullIf($.Name, "") }))
 		const { sql } = compileCHUnsafe(q, {})
-		expect(sql).toContain("nullIf(Name, '') AS result")
+		expect(sql).toContain("nullIf(test_table.Name, '') AS result")
 	})
 
 	it("compiles multiIf", () => {
@@ -63,7 +63,7 @@ describe("expression functions", () => {
 			),
 		}))
 		const { sql } = compileCHUnsafe(q, {})
-		expect(sql).toContain("multiIf(Value > 100, 'high', Value > 50, 'medium', 'low') AS result")
+		expect(sql).toContain("multiIf(test_table.Value > 100, 'high', test_table.Value > 50, 'medium', 'low') AS result")
 	})
 
 	it("compiles mapContains", () => {
@@ -71,7 +71,7 @@ describe("expression functions", () => {
 			.select(($) => ({ id: $.Id }))
 			.where(($) => [CH.mapContains($.Attrs, "http.method")])
 		const { sql } = compileCHUnsafe(q, {})
-		expect(sql).toContain("mapContains(Attrs, 'http.method')")
+		expect(sql).toContain("mapContains(test_table.Attrs, 'http.method')")
 	})
 
 	it("compiles mapGet", () => {
@@ -85,7 +85,7 @@ describe("expression functions", () => {
 			m: CH.mapLiteral(["key1", $.Name], ["key2", CH.lit("val")]),
 		}))
 		const { sql } = compileCHUnsafe(q, {})
-		expect(sql).toContain("map('key1', Name, 'key2', 'val') AS m")
+		expect(sql).toContain("map('key1', test_table.Name, 'key2', 'val') AS m")
 	})
 
 	it("compiles empty mapLiteral", () => {
@@ -97,31 +97,31 @@ describe("expression functions", () => {
 	it("compiles position_", () => {
 		const q = CH.from(TestTable).select(($) => ({ pos: CH.position($.Name, "foo") }))
 		const { sql } = compileCHUnsafe(q, {})
-		expect(sql).toContain("position(Name, 'foo') AS pos")
+		expect(sql).toContain("position(test_table.Name, 'foo') AS pos")
 	})
 
 	it("compiles left_ and length_", () => {
 		const q = CH.from(TestTable).select(($) => ({ result: CH.left($.Name, CH.length($.Name)) }))
 		const { sql } = compileCHUnsafe(q, {})
-		expect(sql).toContain("left(Name, length(Name)) AS result")
+		expect(sql).toContain("left(test_table.Name, length(test_table.Name)) AS result")
 	})
 
 	it("compiles replaceOne", () => {
 		const q = CH.from(TestTable).select(($) => ({ result: CH.replaceOne($.Name, "old", "new") }))
 		const { sql } = compileCHUnsafe(q, {})
-		expect(sql).toContain("replaceOne(Name, 'old', 'new') AS result")
+		expect(sql).toContain("replaceOne(test_table.Name, 'old', 'new') AS result")
 	})
 
 	it("compiles toFloat64OrZero", () => {
 		const q = CH.from(TestTable).select(($) => ({ num: CH.toFloat64OrZero($.Name) }))
 		const { sql } = compileCHUnsafe(q, {})
-		expect(sql).toContain("toFloat64OrZero(Name) AS num")
+		expect(sql).toContain("toFloat64OrZero(test_table.Name) AS num")
 	})
 
 	it("compiles toString_", () => {
 		const q = CH.from(TestTable).select(($) => ({ s: CH.toString($.Value) }))
 		const { sql } = compileCHUnsafe(q, {})
-		expect(sql).toContain("toString(Value) AS s")
+		expect(sql).toContain("toString(test_table.Value) AS s")
 	})
 
 	it("compiles intervalSub", () => {
@@ -174,8 +174,8 @@ describe("expression functions", () => {
 			hi: CH.greatest($.Value, CH.lit(0)),
 		}))
 		const { sql } = compileCHUnsafe(q, {})
-		expect(sql).toContain("least(Value, 100) AS lo")
-		expect(sql).toContain("greatest(Value, 0) AS hi")
+		expect(sql).toContain("least(test_table.Value, 100) AS lo")
+		expect(sql).toContain("greatest(test_table.Value, 0) AS hi")
 	})
 
 	it("compiles toUInt64 and toInt64", () => {
@@ -184,8 +184,8 @@ describe("expression functions", () => {
 			i: CH.toInt64($.Value),
 		}))
 		const { sql } = compileCHUnsafe(q, {})
-		expect(sql).toContain("toUInt64(Value) AS u")
-		expect(sql).toContain("toInt64(Value) AS i")
+		expect(sql).toContain("toUInt64(test_table.Value) AS u")
+		expect(sql).toContain("toInt64(test_table.Value) AS i")
 	})
 
 	it("compiles positionCaseInsensitive", () => {
@@ -193,13 +193,13 @@ describe("expression functions", () => {
 			pos: CH.positionCaseInsensitive($.Name, CH.lit("foo")),
 		}))
 		const { sql } = compileCHUnsafe(q, {})
-		expect(sql).toContain("positionCaseInsensitive(Name, 'foo') AS pos")
+		expect(sql).toContain("positionCaseInsensitive(test_table.Name, 'foo') AS pos")
 	})
 
 	it("compiles extract_", () => {
 		const q = CH.from(TestTable).select(($) => ({ result: CH.extract($.Name, "th:([0-9]+)") }))
 		const { sql } = compileCHUnsafe(q, {})
-		expect(sql).toContain("extract(Name, 'th:([0-9]+)') AS result")
+		expect(sql).toContain("extract(test_table.Name, 'th:([0-9]+)') AS result")
 	})
 
 	it("compiles arrayFilter", () => {
@@ -221,7 +221,7 @@ describe("expression functions", () => {
 			result: CH.arrayStringConcat(CH.arrayOf($.Name, CH.lit("x")), " | "),
 		}))
 		const { sql } = compileCHUnsafe(q, {})
-		expect(sql).toContain("arrayStringConcat([Name, 'x'], ' | ') AS result")
+		expect(sql).toContain("arrayStringConcat([test_table.Name, 'x'], ' | ') AS result")
 	})
 })
 
@@ -236,7 +236,7 @@ describe("parametric aggregates", () => {
 			}))
 			.groupBy("id")
 		const { sql } = compileCHUnsafe(q, {})
-		expect(sql).toContain("windowFunnel(3600)(Timestamp, Name = 'a', Name = 'b', Value > 1) AS level")
+		expect(sql).toContain("windowFunnel(3600)(test_table.Timestamp, test_table.Name = 'a', test_table.Name = 'b', test_table.Value > 1) AS level")
 	})
 
 	it("compiles windowFunnel with a mode", () => {
@@ -245,7 +245,7 @@ describe("parametric aggregates", () => {
 		}))
 		const { sql } = compileCHUnsafe(q, {})
 		expect(sql).toContain(
-			"windowFunnel(86400, 'strict_order')(Timestamp, Name = 'a', Name = 'b') AS level",
+			"windowFunnel(86400, 'strict_order')(test_table.Timestamp, test_table.Name = 'a', test_table.Name = 'b') AS level",
 		)
 	})
 
@@ -260,7 +260,7 @@ describe("parametric aggregates", () => {
 		}))
 		const { sql } = compileCHUnsafe(q, {})
 		expect(sql).toContain(
-			"sequenceMatch('(?1)(?t<3600)(?2)')(Timestamp, Name = 'a', Name = 'b') AS matched",
+			"sequenceMatch('(?1)(?t<3600)(?2)')(test_table.Timestamp, test_table.Name = 'a', test_table.Name = 'b') AS matched",
 		)
 	})
 
@@ -287,7 +287,7 @@ describe("condition combinators", () => {
 			.select(($) => ({ id: $.Id }))
 			.where(($) => [$.Name.eq("alice").and($.Value.gt(10))])
 		const { sql } = compileCHUnsafe(q, {})
-		expect(sql).toContain("(Name = 'alice' AND Value > 10)")
+		expect(sql).toContain("(test_table.Name = 'alice' AND test_table.Value > 10)")
 	})
 
 	it("or() combines conditions", () => {
@@ -295,7 +295,7 @@ describe("condition combinators", () => {
 			.select(($) => ({ id: $.Id }))
 			.where(($) => [$.Name.eq("alice").or($.Name.eq("bob"))])
 		const { sql } = compileCHUnsafe(q, {})
-		expect(sql).toContain("(Name = 'alice' OR Name = 'bob')")
+		expect(sql).toContain("(test_table.Name = 'alice' OR test_table.Name = 'bob')")
 	})
 
 	it("chains and/or", () => {
@@ -303,7 +303,7 @@ describe("condition combinators", () => {
 			.select(($) => ({ id: $.Id }))
 			.where(($) => [$.Name.eq("alice").or($.Name.eq("bob")).and($.Value.gt(0))])
 		const { sql } = compileCHUnsafe(q, {})
-		expect(sql).toContain("((Name = 'alice' OR Name = 'bob') AND Value > 0)")
+		expect(sql).toContain("((test_table.Name = 'alice' OR test_table.Name = 'bob') AND test_table.Value > 0)")
 	})
 })
 
