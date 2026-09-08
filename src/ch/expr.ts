@@ -8,7 +8,7 @@
 
 import { DateTime, Result, Schema } from "effect"
 import type { SqlFragment } from "../sql/sql-fragment"
-import { raw, str, compile, as_ as sqlAs } from "../sql/sql-fragment"
+import { raw, str, compile, as_ as sqlAs, lazy } from "../sql/sql-fragment"
 import { chDateTimeLiteral, CHNumber, string as chString, type CHType, type InferTS } from "./types"
 import { encodeColumnLiteral } from "./literal"
 import { markTenantColumn, markTenantPredicate, tenantColumnOf, tenantPredicatesOf } from "./tenant"
@@ -189,7 +189,7 @@ const arith = <Result>(
 		acceptsNull(lhsSchema) ||
 		acceptsNull(rhsSchema)
 	return makeExpr(
-		raw(`${compile(lhs)} ${op} ${compile(toFragment(rhs))}`),
+		lazy(() => `${compile(lhs)} ${op} ${compile(toFragment(rhs))}`),
 		(nullable ? Schema.NullOr(CHNumber) : CHNumber) as Schema.Codec<Result, any>,
 	)
 }
@@ -222,29 +222,30 @@ export function makeExpr<T>(
 		return literal !== undefined && !isExprLike(value) ? literal(value) : toFragment(value)
 	}
 
+	// Keep operand rendering lazy so nested subqueries reach the owning compiler.
 	const self: Expr<T> = {
 		_brand: "Expr" as const,
 		...(schema !== undefined ? { schema } : undefined),
 		toFragment: () => fragment,
 
-		eq: (other) => makeCond(raw(`${compile(fragment)} = ${compile(operand(other))}`)),
-		neq: (other) => makeCond(raw(`${compile(fragment)} != ${compile(operand(other))}`)),
-		gt: (other) => makeCond(raw(`${compile(fragment)} > ${compile(operand(other))}`)),
-		gte: (other) => makeCond(raw(`${compile(fragment)} >= ${compile(operand(other))}`)),
-		lt: (other) => makeCond(raw(`${compile(fragment)} < ${compile(operand(other))}`)),
-		lte: (other) => makeCond(raw(`${compile(fragment)} <= ${compile(operand(other))}`)),
+		eq: (other) => makeCond(lazy(() => `${compile(fragment)} = ${compile(operand(other))}`)),
+		neq: (other) => makeCond(lazy(() => `${compile(fragment)} != ${compile(operand(other))}`)),
+		gt: (other) => makeCond(lazy(() => `${compile(fragment)} > ${compile(operand(other))}`)),
+		gte: (other) => makeCond(lazy(() => `${compile(fragment)} >= ${compile(operand(other))}`)),
+		lt: (other) => makeCond(lazy(() => `${compile(fragment)} < ${compile(operand(other))}`)),
+		lte: (other) => makeCond(lazy(() => `${compile(fragment)} <= ${compile(operand(other))}`)),
 
-		like: (pattern: string) => makeCond(raw(`${compile(fragment)} LIKE ${compile(str(pattern))}`)),
-		notLike: (pattern: string) => makeCond(raw(`${compile(fragment)} NOT LIKE ${compile(str(pattern))}`)),
-		ilike: (pattern: string) => makeCond(raw(`${compile(fragment)} ILIKE ${compile(str(pattern))}`)),
+		like: (pattern: string) => makeCond(lazy(() => `${compile(fragment)} LIKE ${compile(str(pattern))}`)),
+		notLike: (pattern: string) => makeCond(lazy(() => `${compile(fragment)} NOT LIKE ${compile(str(pattern))}`)),
+		ilike: (pattern: string) => makeCond(lazy(() => `${compile(fragment)} ILIKE ${compile(str(pattern))}`)),
 
 		in_: (...values) => {
-			const escaped = values.map((v) => compile(operand(v))).join(", ")
-			return makeCond(raw(`${compile(fragment)} IN (${escaped})`))
+			const escaped = () => values.map((v) => compile(operand(v))).join(", ")
+			return makeCond(lazy(() => `${compile(fragment)} IN (${escaped()})`))
 		},
 		notIn: (...values) => {
-			const escaped = values.map((v) => compile(operand(v))).join(", ")
-			return makeCond(raw(`${compile(fragment)} NOT IN (${escaped})`))
+			const escaped = () => values.map((v) => compile(operand(v))).join(", ")
+			return makeCond(lazy(() => `${compile(fragment)} NOT IN (${escaped()})`))
 		},
 
 		// NOTE: these do NOT parenthesize their result, so chaining follows SQL
@@ -358,7 +359,7 @@ export function makeColumnRef<Name extends string, ColType extends CHType<string
 		{
 			columnName: name as Name,
 			get(key: string): Expr<any> {
-				return makeExpr<any>(raw(`${name}[${compile(str(key))}]`), columnType?.element?.schema)
+				return makeExpr<any>(lazy(() => `${name}[${compile(str(key))}]`), columnType?.element?.schema)
 			},
 		},
 	) as ColumnRef<Name, ColType>
@@ -372,11 +373,11 @@ export function makeCond(fragment: SqlFragment): Condition {
 		toFragment: () => fragment,
 		and(other) {
 			return markTenantPredicate(
-				makeCond(raw(`(${compile(fragment)} AND ${compile(other.toFragment())})`)),
+				makeCond(lazy(() => `(${compile(fragment)} AND ${compile(other.toFragment())})`)),
 				[...tenantPredicatesOf(this), ...tenantPredicatesOf(other)],
 			)
 		},
-		or: (other) => makeCond(raw(`(${compile(fragment)} OR ${compile(other.toFragment())})`)),
+		or: (other) => makeCond(lazy(() => `(${compile(fragment)} OR ${compile(other.toFragment())})`)),
 	}
 }
 
@@ -407,23 +408,23 @@ export function outerRef<T = string>(name: string): Expr<T> {
 }
 
 export function inList<T extends string>(expr: Expr<T>, values: readonly string[]): Condition {
-	const escaped = values.map((v) => compile(str(v))).join(", ")
-	return makeCond(raw(`${compile(expr.toFragment())} IN (${escaped})`))
+	const escaped = () => values.map((v) => compile(str(v))).join(", ")
+	return makeCond(lazy(() => `${compile(expr.toFragment())} IN (${escaped()})`))
 }
 
 export function inExprList<T>(expr: Expr<T>, values: readonly Expr<T>[]): Condition {
-	const escaped = values.map((v) => compile(v.toFragment())).join(", ")
-	return makeCond(raw(`${compile(expr.toFragment())} IN (${escaped})`))
+	const escaped = () => values.map((v) => compile(v.toFragment())).join(", ")
+	return makeCond(lazy(() => `${compile(expr.toFragment())} IN (${escaped()})`))
 }
 
 export function notInList(expr: Expr<string>, values: readonly string[]): Condition {
-	const escaped = values.map((v) => compile(str(v))).join(", ")
-	return makeCond(raw(`${compile(expr.toFragment())} NOT IN (${escaped})`))
+	const escaped = () => values.map((v) => compile(str(v))).join(", ")
+	return makeCond(lazy(() => `${compile(expr.toFragment())} NOT IN (${escaped()})`))
 }
 
 /** Wrap a condition in NOT (...). */
 export function not(condition: Condition): Condition {
-	return makeCond(raw(`NOT (${compile(condition.toFragment())})`))
+	return makeCond(lazy(() => `NOT (${compile(condition.toFragment())})`))
 }
 
 // Raw expression (escape hatch)

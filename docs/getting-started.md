@@ -10,13 +10,17 @@ Effect application: `Effect.runPromise` lets you use it from ordinary async code
 These examples are checked against Effect `4.0.0-rc.112` and the builder in this repository.
 The package declares `effect >=4.0.0-rc.111 <5` as a peer dependency; Effect 3 is incompatible.
 
-Install the built GitHub release with its peer dependency:
+Install from npm with its Effect 4 peer dependency:
 
 ```sh
-npm install https://github.com/MapleTechLabs/effect-clickhouse/releases/download/v0.1.0/maple-dev-effect-clickhouse-0.1.0.tgz effect@4.0.0-rc.112
+npm install @maple-dev/effect-clickhouse "effect@>=4.0.0-rc.112 <5"
 ```
 
-The npm package name is `@maple-dev/effect-clickhouse`; npm publication is pending.
+The recommended range accepts Effect `4.0.0-rc.112` and newer releases in the
+`4.0.0` prerelease series, plus stable Effect 4 releases. It excludes Effect 3 and 5.
+Quote the range to prevent shell redirection. The exact version above records the
+version used to check these examples; it is not an installation pin.
+
 To build from source instead:
 
 ```sh
@@ -30,11 +34,11 @@ bun pm pack
 Install the resulting `.tgz` into your own project with its peer dependency:
 
 ```sh
-npm install /absolute/path/to/the-generated-package.tgz effect@4.0.0-rc.112
+npm install /absolute/path/to/the-generated-package.tgz "effect@>=4.0.0-rc.112 <5"
 ```
 
-Keep the Effect version explicit while adopting the prerelease. An unqualified `effect`
-currently installs Effect 3. Use an ESM project (`"type": "module"` in `package.json`)
+Keep the Effect 4 range explicit when installing. Use an ESM project
+(`"type": "module"` in `package.json`)
 and a TypeScript runner such as Bun for the `.ts` files below. A database client is a
 separate dependency, needed only when you execute SQL.
 

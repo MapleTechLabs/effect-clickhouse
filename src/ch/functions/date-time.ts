@@ -1,7 +1,7 @@
 import { type DateTime, SchemaAST } from "effect"
 import { makeExpr } from "../expr"
 import { schemaOf } from "../define-fn"
-import { raw, str, compile } from "../../sql/sql-fragment"
+import { str, compile, lazy } from "../../sql/sql-fragment"
 import type { Expr } from "../expr"
 import * as T from "../types"
 
@@ -25,12 +25,12 @@ export function toStartOfInterval<T extends DateTimeValue = DateTime.Utc>(
 	col: DateTimeExpr<T>,
 	seconds: number | Expr<number>,
 ): DateTimeExpr<T> {
-	const secStr =
+	const secStr = () =>
 		typeof seconds === "number"
 			? String(Math.round(seconds))
 			: compile((seconds as Expr<number>).toFragment())
 	return makeExpr(
-		raw(`toStartOfInterval(${compile(col.toFragment())}, INTERVAL ${secStr} SECOND)`),
+		lazy(() => `toStartOfInterval(${compile(col.toFragment())}, INTERVAL ${secStr()} SECOND)`),
 		sameDateTime(col),
 	)
 }
@@ -43,7 +43,7 @@ export function toStartOfInterval<T extends DateTimeValue = DateTime.Utc>(
  * `*_hourly` tables on this exact boundary).
  */
 export function toStartOfHour<T extends DateTimeValue = DateTime.Utc>(col: DateTimeExpr<T>): DateTimeExpr<T> {
-	return makeExpr(raw(`toStartOfHour(${compile(col.toFragment())})`), sameDateTime(col))
+	return makeExpr(lazy(() => `toStartOfHour(${compile(col.toFragment())})`), sameDateTime(col))
 }
 
 /**
@@ -54,7 +54,7 @@ export function toStartOfHour<T extends DateTimeValue = DateTime.Utc>(col: DateT
 export function toStartOfMinute<T extends DateTimeValue = DateTime.Utc>(
 	col: DateTimeExpr<T>,
 ): DateTimeExpr<T> {
-	return makeExpr(raw(`toStartOfMinute(${compile(col.toFragment())})`), sameDateTime(col))
+	return makeExpr(lazy(() => `toStartOfMinute(${compile(col.toFragment())})`), sameDateTime(col))
 }
 
 /**
@@ -63,7 +63,7 @@ export function toStartOfMinute<T extends DateTimeValue = DateTime.Utc>(
  * hour-of-day ±1) across the trailing week without storing baselines anywhere.
  */
 export function toHour(col: DateTimeExpr<DateTimeValue>): Expr<number> {
-	return makeExpr(raw(`toHour(${compile(col.toFragment())})`), T.uint8.schema)
+	return makeExpr(lazy(() => `toHour(${compile(col.toFragment())})`), T.uint8.schema)
 }
 
 /**
@@ -73,7 +73,7 @@ export function toHour(col: DateTimeExpr<DateTimeValue>): Expr<number> {
  * parse RFC3339.
  */
 export function toUnixTimestamp(col: DateTimeExpr<DateTimeValue>): Expr<number> {
-	return makeExpr(raw(`toUnixTimestamp(${compile(col.toFragment())})`), T.uint32.schema)
+	return makeExpr(lazy(() => `toUnixTimestamp(${compile(col.toFragment())})`), T.uint32.schema)
 }
 
 /**
@@ -81,18 +81,18 @@ export function toUnixTimestamp(col: DateTimeExpr<DateTimeValue>): Expr<number> 
  * Used for counter-rate delta windows where sub-second scrape spacing matters.
  */
 export function toUnixTimestamp64Nano(col: DateTimeExpr<DateTimeValue>): Expr<number> {
-	return makeExpr(raw(`toUnixTimestamp64Nano(${compile(col.toFragment())})`), T.uint64.schema)
+	return makeExpr(lazy(() => `toUnixTimestamp64Nano(${compile(col.toFragment())})`), T.uint64.schema)
 }
 
 export function intervalSub<T extends DateTimeValue = DateTime.Utc>(
 	col: DateTimeExpr<T>,
 	seconds: number | Expr<number>,
 ): DateTimeExpr<T> {
-	const secStr =
+	const secStr = () =>
 		typeof seconds === "number"
 			? String(Math.round(seconds))
 			: compile((seconds as Expr<number>).toFragment())
-	return makeExpr(raw(`${compile(col.toFragment())} - INTERVAL ${secStr} SECOND`), sameDateTime(col))
+	return makeExpr(lazy(() => `${compile(col.toFragment())} - INTERVAL ${secStr()} SECOND`), sameDateTime(col))
 }
 
 /** The other half of {@link intervalSub} — `expr + INTERVAL n SECOND`. */
@@ -100,17 +100,17 @@ export function intervalAdd<T extends DateTimeValue = DateTime.Utc>(
 	col: DateTimeExpr<T>,
 	seconds: number | Expr<number>,
 ): DateTimeExpr<T> {
-	const secStr =
+	const secStr = () =>
 		typeof seconds === "number"
 			? String(Math.round(seconds))
 			: compile((seconds as Expr<number>).toFragment())
-	return makeExpr(raw(`${compile(col.toFragment())} + INTERVAL ${secStr} SECOND`), sameDateTime(col))
+	return makeExpr(lazy(() => `${compile(col.toFragment())} + INTERVAL ${secStr()} SECOND`), sameDateTime(col))
 }
 
 /** `formatDateTime(expr, 'format')` — format a DateTime/DateTime64 as a string. */
 export function formatDateTime(col: DateTimeExpr<DateTimeValue>, format: string): Expr<string> {
 	return makeExpr(
-		raw(`formatDateTime(${compile(col.toFragment())}, ${compile(str(format))})`),
+		lazy(() => `formatDateTime(${compile(col.toFragment())}, ${compile(str(format))})`),
 		T.string.schema,
 	)
 }
@@ -128,7 +128,7 @@ export function toDateTime(col: Expr<any>): Expr<any> {
 	const input = schemaOf(col)
 	const stringInput = input !== undefined && isStringType(SchemaAST.toType(input.ast))
 	return makeExpr<any>(
-		raw(`toDateTime(${compile(col.toFragment())})`),
+		lazy(() => `toDateTime(${compile(col.toFragment())})`),
 		stringInput ? T.dateTimeString.schema : T.dateTime.schema,
 	)
 }

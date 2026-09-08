@@ -45,7 +45,7 @@ fill gaps in your application if the chart needs zeros. A decoded bucket is `Dat
 not a native `Date`; use Effect's `DateTime` utilities or a string timestamp type to serialize it.
 Validate a user-selected bucket size as a positive integer and cap the number of buckets.
 
-Per `schema-pk-filter-on-orderby`, performance depends on whether the real table's sorting key
+Performance depends on whether the real table's sorting key
 supports these filters. Declaring a TypeScript table does not create an index or make a scan cheap.
 See [ClickHouse query optimization](https://clickhouse.com/docs/optimize/query-optimization).
 

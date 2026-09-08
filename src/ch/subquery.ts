@@ -6,11 +6,12 @@
 // today only because everything crossing it is a hoisted `function` declaration
 // — one top-level `const` away from a TDZ crash in the bundle.
 
+import { renderSubquery } from "./subquery-context"
 import { compileCHUnsafe } from "./compile"
 import { type Condition, type Expr, makeCond, makeExpr, makeUntypedExpr } from "./expr"
 import type { CHQuery } from "./query"
 import type { CHType } from "./types"
-import { compile, lazy, raw } from "../sql/sql-fragment"
+import { compile, lazy } from "../sql/sql-fragment"
 
 /**
  * A subquery, either as a builder query or as SQL someone compiled elsewhere.
@@ -22,36 +23,27 @@ import { compile, lazy, raw } from "../sql/sql-fragment"
 export type Subquery = string | CHQuery<any, any, any>
 
 /**
- * Compile a subquery to bare SQL.
- *
- * Deferring the params is deliberate, not a shortcut. `compileCH` substitutes
- * placeholders across the whole assembled string as its last step, so
- * placeholders inside a spliced subquery survive to the outer query's
- * substitution pass and are resolved there with the outer params.
+ * Render in the owning compiler so params, visible CTEs, and tenant scope stay
+ * connected. Standalone fragment rendering defers params for a later compile.
  */
 const toSql = (subquery: Subquery): string =>
-	typeof subquery === "string"
-		? subquery
-		: compileCHUnsafe(subquery, {}, { skipFormat: true, deferParams: true }).sql
+	renderSubquery(subquery, (query) =>
+		typeof query === "string"
+			? query
+			: compileCHUnsafe(query, {}, { skipFormat: true, deferParams: true }).sql,
+	)
 
-// A note that applies to all three of these:
-//
-// A subquery condition contributes NOTHING to the outer query's tenant scope,
-// even when the subquery itself filters the tenant column. `WHERE x IN (SELECT
-// y FROM t WHERE TenantId = 'a')` does not confine the outer read to tenant
-// `a` — nothing stops tenant `b` from having the same `y`. The outer query must
-// still carry its own
-// tenant predicate, or read only from sources that are themselves scoped.
-// `makeCond` without the `scopesTenant` flag is what encodes that.
+// Subqueries contribute their own source scope, never a binding on outer rows.
+// An inner tenant filter cannot confine an otherwise unfiltered outer source.
 
 /** `EXISTS (subquery)` — for correlated subqueries (see `outerRef`). */
 export function exists(subquery: Subquery): Condition {
-	return makeCond(raw(`EXISTS (${toSql(subquery)})`))
+	return makeCond(lazy(() => `EXISTS (${toSql(subquery)})`))
 }
 
 /** `expr IN (subquery)`. */
 export function inSubquery<T>(expr: Expr<T>, subquery: Subquery): Condition {
-	return makeCond(raw(`${compile(expr.toFragment())} IN (${toSql(subquery)})`))
+	return makeCond(lazy(() => `${compile(expr.toFragment())} IN (${toSql(subquery)})`))
 }
 
 /**
@@ -61,7 +53,7 @@ export function inSubquery<T>(expr: Expr<T>, subquery: Subquery): Condition {
  * is never true. Project a non-nullable column, or filter the NULLs inside.
  */
 export function notInSubquery<T>(expr: Expr<T>, subquery: Subquery): Condition {
-	return makeCond(raw(`${compile(expr.toFragment())} NOT IN (${toSql(subquery)})`))
+	return makeCond(lazy(() => `${compile(expr.toFragment())} NOT IN (${toSql(subquery)})`))
 }
 
 // Spliced sub-SELECTs
@@ -93,11 +85,8 @@ export function notInSubquery<T>(expr: Expr<T>, subquery: Subquery): Condition {
  * Params are deferred: placeholders inside the spliced SQL are resolved by the
  * outer query's substitution pass, with the outer params.
  *
- * Use the result inside a `select`/`where`/`having` callback, which is where the
- * deferral pays off. Comparison and arithmetic methods render their operand
- * eagerly, so combining one of these into a `Condition` at module scope —
- * `const c = $.Ts.gte(subqueryExpr(inner, T.dateTime))` outside a callback —
- * compiles the inner query there, which is the throw this exists to avoid.
+ * Expression composition preserves deferred rendering, including when a caller
+ * builds the expression or condition before the outer query.
  */
 export function subqueryExpr<T>(
 	subquery: Subquery,

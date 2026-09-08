@@ -1,5 +1,5 @@
 import { makeExpr, toFragment } from "../expr"
-import { raw, compile } from "../../sql/sql-fragment"
+import { compile, lazy } from "../../sql/sql-fragment"
 import type { Expr, Condition } from "../expr"
 import { Schema } from "effect"
 import { compileTypedFnCall, defineFn, firstTypedNonNull, numericResultSchema, schemaOf } from "../define-fn"
@@ -15,11 +15,11 @@ export const if_ = <T>(cond: Condition, then_: Expr<T>, else_: Expr<T>): Expr<T>
 	)
 
 export function multiIf<T>(cases: Array<[Condition, Expr<T>]>, else_: Expr<T>): Expr<T> {
-	const parts = cases
+	const parts = () => cases
 		.map(([cond, val]) => `${compile(cond.toFragment())}, ${compile(val.toFragment())}`)
 		.join(", ")
 	return makeExpr(
-		raw(`multiIf(${parts}, ${compile(else_.toFragment())})`),
+		lazy(() => `multiIf(${parts()}, ${compile(else_.toFragment())})`),
 		branchSchema<T>(...cases.map(([, value]) => value), else_),
 	)
 }
@@ -72,7 +72,7 @@ export function ifNotFinite<N extends number | null>(
 	fallback: number | Expr<number>,
 ): Expr<number | Extract<N, null>> {
 	return makeExpr<number | Extract<N, null>>(
-		raw(`ifNotFinite(${compile(expr.toFragment())}, ${compile(toFragment(fallback))})`),
+		lazy(() => `ifNotFinite(${compile(expr.toFragment())}, ${compile(toFragment(fallback))})`),
 		numericResultSchema(expr),
 	)
 }

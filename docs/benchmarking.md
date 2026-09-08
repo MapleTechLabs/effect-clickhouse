@@ -12,8 +12,7 @@ explicit import extensions. Suite modules execute trusted local code.
 ## Setup
 
 Install the library with its Effect 4 peer dependency using [Getting started](./getting-started.md#installation-and-compatibility).
-The first npm release is pending; that guide also covers installing a source-built
-tarball. The CLI is included in the same package, with no separate benchmark dependency.
+That guide also covers installing a source-built tarball. The CLI is included in the same package, with no separate benchmark dependency.
 
 In your project's `package.json`, add:
 

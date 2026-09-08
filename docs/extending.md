@@ -73,13 +73,27 @@ _(Backed by `docs/extending.md > defineCondFn declares a predicate`.)_
 
 When the signature is too irregular for `defineFn`, write the wrapper yourself:
 
-```ts
-import { compileFnCall, compileFnCallCond } from "@maple-dev/effect-clickhouse"
+```ts title="typed-function.ts"
+import * as CH from "@maple-dev/effect-clickhouse"
+import * as T from "@maple-dev/effect-clickhouse/types"
 
-const greatestOf = <T>(...exprs: CH.Expr<T>[]) => compileFnCall<T>("greatest", ...exprs)
+const greatestOf = (first: CH.Expr<number>, ...rest: CH.Expr<number>[]) =>
+	CH.compileTypedFnCall<number>("greatest", T.float64.schema, first, ...rest)
+
+const Events = CH.table("events", { Name: T.string, DurationMs: T.uint64 })
+export const compiled = CH.compileUnsafe(
+	CH.from(Events).select(($) => ({ name: $.Name, durationMs: greatestOf($.DurationMs, CH.lit(1)) })),
+	{},
+)
+console.log(compiled.rowSchemaSource) // "derived"
 ```
 
+This wrapper accepts non-nullable numeric expressions and provides their result codec.
+For other input types, choose a codec that matches the function's actual result.
 Arguments still route through the standard fragment conversion, so escaping is preserved.
+`compileFnCall` has no result codec: selecting its result disables derived decoding for
+**the whole row**, even when its TypeScript return type is `Expr<number>`.
+`compileFnCallCond` returns a predicate for use in `where`.
 
 ## `makeExpr` / `makeCond` — custom SQL syntax
 
@@ -99,8 +113,20 @@ schema — passing `undefined` is how a wrapper _forwards_ the untypedness of it
 (`schemaOf(arg)`), not something to write. For an expression that genuinely has no type, use
 `makeUntypedExpr`, which says so and costs the query its row schema knowingly.
 
-You are now assembling SQL text: interpolate only values you control, and route anything
-user-supplied through `str()` from the `/sql` subpath so it gets escaped.
+You are now assembling SQL text: interpolate only values you control, and route
+user-supplied string values through `compile(str(value))` from the `/sql` subpath.
+`str(value)` returns a fragment, not SQL text; interpolating that fragment directly
+produces `[object Object]`. For example:
+
+```ts title="escaped-sql.ts"
+import { compile, str } from "@maple-dev/effect-clickhouse/sql"
+
+export const predicate = `Name = ${compile(str("O'Reilly"))}`
+console.log(predicate) // Name = 'O\'Reilly'
+```
+
+Use this for string literals only. Keep SQL structure and identifiers under application
+control, and validate numeric inputs such as the quantile level separately.
 
 ## A column type of your own
 

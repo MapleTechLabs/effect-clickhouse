@@ -10,6 +10,44 @@ const One = CH.table("system.one", {})
 
 it.layer(FetchHttpClient.layer)("publishing regressions against ClickHouse", (it) => {
 	describe.skipIf(!endpoint)("live", () => {
+		it.effect("classifies scalar counts across tenants and preserves same-tenant counts", () =>
+			Effect.gen(function* () {
+				const events = CH.table(
+					"(SELECT arrayJoin(['a', 'b']) AS OrgId)",
+					{ OrgId: T.string },
+					{ tenantColumn: "OrgId" },
+				)
+				const all = CH.from(events).select(() => ({ total: CH.count() }))
+				const own = all.where(($) => [$.OrgId.eq("a")])
+				for (const [inner, expectedScope, total] of [
+					[all, "cross-tenant", 2],
+					[own, "single-tenant", 1],
+				] as const) {
+					const compiled = CH.compileUnsafe(
+						CH.from(events).select(($) => ({
+							org: $.OrgId,
+							total: CH.subqueryExpr(inner, T.uint64),
+						})).where(($) => [$.OrgId.eq("a")]),
+						{},
+					)
+					expect(compiled.tenantScope).toBe(expectedScope)
+					expect((yield* execute(compiled)).rows).toEqual([{ org: "a", total }])
+				}
+			}),
+		)
+
+		it.effect("decodes arrays with nullable elements in either order", () =>
+			Effect.gen(function* () {
+				const compiled = CH.compileUnsafe(CH.from(One).select(() => ({
+					lastNull: CH.arrayOf(CH.lit(1), CH.nullIf(CH.lit(2), 2)),
+					firstNull: CH.arrayOf(CH.nullIf(CH.lit(2), 2), CH.lit(1)),
+				})), {})
+				const { rows } = yield* execute(compiled)
+				expect(rows).toEqual([{ lastNull: [1, null], firstNull: [null, 1] }])
+				expect(yield* compiled.encodeRows(rows)).toEqual(rows)
+			}),
+		)
+
 		it.effect("labels a join that exposes another tenant as cross-tenant", () =>
 			Effect.gen(function* () {
 				const a = CH.table("a", { OrgId: T.string, Id: T.uint8 }, { tenantColumn: "OrgId" })

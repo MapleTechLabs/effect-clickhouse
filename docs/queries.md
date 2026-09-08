@@ -103,10 +103,8 @@ Takes `[column, direction]` tuples, one per sort key:
 // ORDER BY count DESC, name ASC
 ```
 
-> **This is the API's sharpest edge.** `.orderBy("count", "desc")` — two bare strings — is a
-> type error, but if you reach it from untyped code it used to destructure each string into
-> its first two characters and emit `ORDER BY c O, d E`. It now raises `QueryBuilderDefect`
-> instead — a defect, because the specs are written at the definition.
+Passing two bare strings, `.orderBy("count", "desc")`, is a type error.
+Untyped callers receive `QueryBuilderDefect`; use a tuple for each sort key.
 
 _(Backed by `docs/queries.md > orderBy takes tuples` and `> orderBy rejects a bare string`.)_
 

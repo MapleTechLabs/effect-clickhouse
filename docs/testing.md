@@ -34,7 +34,7 @@ The user defaults to `default` and the password to an empty string.
 
 `bun run test:package` builds and packs the package, installs the tarball outside the
 workspace with its Effect peer, typechecks a consumer with strict declarations, and
-executes imports from all four public entry points under Node. This needs npm registry
+executes imports from all seven public entry points under Node. This needs npm registry
 access. It uses the installed Effect and TypeScript versions, with explicit Node, DOM,
 and disposable type libraries required by the Effect declarations.
 

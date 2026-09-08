@@ -24,19 +24,17 @@ Built on [Effect](https://effect.website) (peer dependency).
 
 ## Install
 
-Install the built GitHub release with its Effect peer:
+Install the package with its Effect 4 peer:
 
 ```bash
-bun add https://github.com/MapleTechLabs/effect-clickhouse/releases/download/v0.1.0/maple-dev-effect-clickhouse-0.1.0.tgz effect@4.0.0-rc.112
+bun add @maple-dev/effect-clickhouse "effect@>=4.0.0-rc.112 <5"
 ```
 
-The npm package name is `@maple-dev/effect-clickhouse`; npm publication is pending.
 See [Getting started](./docs/getting-started.md) for source builds and examples.
 
-`effect` is a peer dependency — bring your own. The explicit version matters: this package
-requires **Effect 4** (`>=4.0.0-rc.111`), which is not on npm's `latest` tag.
-Installing a bare `effect` gets you 3.x, and the package will throw
-`Schema.TaggedError is not a function` on import.
+`effect` is a peer dependency. The recommended range `>=4.0.0-rc.112 <5` allows
+newer Effect 4 releases without opting into Effect 5. Effect 3 is incompatible.
+Keep the version range quoted so your shell does not interpret `<` or `>`.
 
 ## Quick start
 
@@ -107,9 +105,7 @@ with it.
 
 `count()` is a `UInt64`, which ClickHouse's `FORMAT JSON` quotes and a gateway with
 `output_format_json_quote_64bit_integers=0` does not — the
-column type accepts either, so the same code works against both backends. That
-is the class of drift a bare cast used to hide, which is why there is no
-`castRows`.
+column type accepts either and decodes both to a JavaScript number.
 
 Pass a `rowSchema` explicitly to **narrow** what the builder inferred (a `String`
 column as a literal union, say); it wins over the derived one. If any selected

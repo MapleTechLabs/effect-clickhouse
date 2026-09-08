@@ -1,16 +1,26 @@
 import { makeCond, makeExpr, toFragment } from "../expr"
-import { raw, str, compile } from "../../sql/sql-fragment"
+import { str, compile, lazy } from "../../sql/sql-fragment"
 import type { Condition, Expr } from "../expr"
 import { Schema } from "effect"
 import * as T from "../types"
-import { defineFn, elementOf, sameAs, schemaOf, schemaOfAny } from "../define-fn"
+import { defineFn, elementOf, sameAs, schemaOf } from "../define-fn"
 
 // Array constructors (handwritten — bracket syntax, not fn() call)
 
 export function arrayOf<T>(...exprs: Expr<T>[]): Expr<ReadonlyArray<T>> {
-	const args = exprs.map((e) => compile(e.toFragment())).join(", ")
-	const element = schemaOfAny<T>(...exprs)
-	return makeExpr(raw(`[${args}]`), element && Schema.Array(element))
+	const args = () => exprs.map((e) => compile(e.toFragment())).join(", ")
+	const schemas = exprs.map((expr) => expr.schema)
+	// Every element contributes to the result type. One unknown element means
+	// the array cannot claim to validate its contents.
+	const typed = schemas.filter((schema): schema is Schema.Codec<T, any> => schema !== undefined)
+	const unique = [...new Set(typed)]
+	const element =
+		typed.length !== schemas.length || unique.length === 0
+			? undefined
+			: unique.length === 1
+				? unique[0]
+				: Schema.Union(unique)
+	return makeExpr(lazy(() => `[${args()}]`), element && Schema.Array(element))
 }
 
 // Array functions (handwritten — polymorphic or special syntax)
@@ -20,17 +30,17 @@ export function arrayStringConcat(
 	sep: string,
 ): Expr<string> {
 	if (Array.isArray(parts)) {
-		const arr = parts.map((p: Expr<string>) => compile(p.toFragment())).join(", ")
-		return makeExpr(raw(`arrayStringConcat([${arr}], ${compile(str(sep))})`), T.string.schema)
+		const arr = () => parts.map((p: Expr<string>) => compile(p.toFragment())).join(", ")
+		return makeExpr(lazy(() => `arrayStringConcat([${arr()}], ${compile(str(sep))})`), T.string.schema)
 	}
 	return makeExpr(
-		raw(`arrayStringConcat(${compile(parts.toFragment())}, ${compile(str(sep))})`),
+		lazy(() => `arrayStringConcat(${compile(parts.toFragment())}, ${compile(str(sep))})`),
 		T.string.schema,
 	)
 }
 
 export function arrayFilter(fn: string, arr: Expr<any>): Expr<any> {
-	return makeExpr(raw(`arrayFilter(${fn}, ${compile(arr.toFragment())})`), schemaOf(arr))
+	return makeExpr(lazy(() => `arrayFilter(${fn}, ${compile(arr.toFragment())})`), schemaOf(arr))
 }
 
 /** `arrayJoin` unnests, so the row value is one element of the array. */
@@ -63,5 +73,5 @@ export const arrayElement = <T>(arr: Expr<ReadonlyArray<T>>, index: number | Exp
 
 export function has<T>(arr: Expr<ReadonlyArray<T>>, value: Expr<T> | T): Condition {
 	const valueFragment = toFragment(value)
-	return makeCond(raw(`has(${compile(arr.toFragment())}, ${compile(valueFragment)})`))
+	return makeCond(lazy(() => `has(${compile(arr.toFragment())}, ${compile(valueFragment)})`))
 }

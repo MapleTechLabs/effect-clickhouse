@@ -35,8 +35,7 @@ await Effect.runPromise(compiled.decodeRows([{ name: "checkout", calls: "42" }])
 Note `calls`. ClickHouse's `FORMAT JSON` quotes 64-bit integers, a client that sets
 `output_format_json_quote_64bit_integers=0` gets them bare, and a gateway
 that refuses `output_format_json_quote_64bit_integers=0` quotes them whatever you asked for.
-`T.uint64` models that once, so nobody rediscovers it as a `ParseError` in production. This is the
-exact class of drift a plain cast used to hide, which is why there is no `castRows`.
+`T.uint64` accepts both wire representations and decodes them to JavaScript numbers.
 
 ## When there is nothing to derive from
 

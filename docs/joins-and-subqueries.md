@@ -187,7 +187,10 @@ a template string of your own:
   a synchronous throw from your query-definition function instead.
 
 You are assembling SQL text inside `wrap`: interpolate only values you control, and route
-anything user-supplied through `str()` from the `/sql` subpath so it gets escaped.
+user-supplied string literals through `compile(str(value))` from the `/sql` subpath.
+`str()` returns a fragment that must be compiled before interpolation into SQL text.
+Keep identifiers and SQL structure under application control; see the
+[escaped SQL example](./extending.md#makeexpr--makecond--custom-sql-syntax).
 
 _(Backed by `docs/joins-and-subqueries.md > subqueryExpr splices an inner query, compiled by the outer compile`.)_
 
@@ -208,6 +211,5 @@ an algorithm selector; compilation alone does not choose a faster algorithm for 
 
 Filter derived tables before joining when practical, especially tenant and time filters.
 Inspect the actual plan and pass `join_algorithm` through your client's settings when needed.
-Per `query-join-filter-before` and `query-join-choose-algorithm`, filtering and algorithm choices
-must be checked against the workload; per `query-join-use-any`, ANY semantics are appropriate
+Check filtering and algorithm choices against your workload. ANY semantics are appropriate
 only when one match is sufficient. See [ClickHouse join guidance](https://clickhouse.com/docs/guides/joining-tables).

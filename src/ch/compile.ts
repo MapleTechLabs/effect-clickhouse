@@ -19,6 +19,7 @@ import { PARAM_MARKER_PREFIX, PARAM_PLACEHOLDER_PATTERN, paramSchema, type Param
 import { encodeLiteral } from "./literal"
 import { Effect, Option, Schema } from "effect"
 import { QueryBuilderDefect, QueryBuilderError } from "./errors"
+import { withSubqueryCompiler } from "./subquery-context"
 import { tenantBoundOf, tenantPredicatesOf, withTenantBound, type TenantPredicate } from "./tenant"
 
 // `QueryBuilderError` moved to ./errors so `expr.ts` can raise it too; still
@@ -647,64 +648,78 @@ function compileInner<
 	const sources: TenantSource[] = [fromSource]
 	const wherePredicates = whereConditions.flatMap((c) => (c ? tenantPredicatesOf(c) : []))
 	const joinPredicates: Array<{ predicates: ReadonlyArray<TenantPredicate>; target?: string }> = []
-	const joins = state.typedJoins.map((j) => {
-		let tableSql: string
-		let source: TenantSource
-		if (j.innerQuery) {
-			const compiled = compileInner(j.innerQuery, params, {
-				skipFormat: true,
-				deferParams,
-				enclosingCtes: visibleCtes,
-			})
-			tableSql = `(${compiled.sql})`
-			source = sourceOf(compiled)
-		} else if (j.tableName) {
-			tableSql = j.tableName
-			source = sourceForTable(
-				j.tableName,
-				j.tenantColumn === undefined ? undefined : `${j.alias}.${j.tenantColumn}`,
-			)
-		} else {
-			throw new QueryBuilderDefect({ message: "TypedJoin: missing table or query" })
+	let sql = withSubqueryCompiler((subquery) => {
+		if (typeof subquery === "string") {
+			sources.push({ scope: "cross-tenant" })
+			return subquery
 		}
-		sources.push(source)
-		if (j.on) {
-			// A LEFT JOIN's ON clause can constrain only its right side. It
-			// cannot remove unmatched rows from the preserved left side.
-			if (j.type !== "LEFT" || source.column !== undefined) {
-				joinPredicates.push({
-					predicates: tenantPredicatesOf(j.on),
-					target: j.type === "LEFT" ? source.column : undefined,
+		const compiled = compileInner(subquery, params, {
+			skipFormat: true,
+			deferParams,
+			enclosingCtes: visibleCtes,
+		})
+		sources.push(sourceOf(compiled))
+		return compiled.sql
+	}, () => {
+		const joins = state.typedJoins.map((j) => {
+			let tableSql: string
+			let source: TenantSource
+			if (j.innerQuery) {
+				const compiled = compileInner(j.innerQuery, params, {
+					skipFormat: true,
+					deferParams,
+					enclosingCtes: visibleCtes,
 				})
+				tableSql = `(${compiled.sql})`
+				source = sourceOf(compiled)
+			} else if (j.tableName) {
+				tableSql = j.tableName
+				source = sourceForTable(
+					j.tableName,
+					j.tenantColumn === undefined ? undefined : `${j.alias}.${j.tenantColumn}`,
+				)
+			} else {
+				throw new QueryBuilderDefect({ message: "TypedJoin: missing table or query" })
 			}
+			sources.push(source)
+			if (j.on) {
+				// A LEFT JOIN's ON clause can constrain only its right side. It
+				// cannot remove unmatched rows from the preserved left side.
+				if (j.type !== "LEFT" || source.column !== undefined) {
+					joinPredicates.push({
+						predicates: tenantPredicatesOf(j.on),
+						target: j.type === "LEFT" ? source.column : undefined,
+					})
+				}
+			}
+			return {
+				type: j.type,
+				table: tableSql,
+				alias: j.alias,
+				on: j.on ? compileSqlFragment(j.on.toFragment()) : undefined,
+			}
+		})
+
+		const sqlQuery: SqlQuery = {
+			select: selectFragments,
+			from: fromFragment,
+			joins,
+			where: whereFragments,
+			groupBy: state.groupByKeys.map((k) => raw(k)),
+			// Deliberately excluded from tenant evidence: by HAVING time the
+			// rows are already aggregated, so the scan that produced them crossed
+			// tenants no matter what this filters out.
+			having: (state.havingFn ? state.havingFn($) : [])
+				.filter((c): c is NonNullable<typeof c> => c != null)
+				.map((c) => c.toFragment()),
+			orderBy: orderByClause(state.orderBySpecs).map(raw),
+			limit: state.limitValue != null ? raw(String(Math.round(state.limitValue))) : undefined,
+			offset: state.offsetValue != null ? raw(String(Math.round(state.offsetValue))) : undefined,
+			format: options?.skipFormat ? undefined : state.formatValue,
 		}
-		return {
-			type: j.type,
-			table: tableSql,
-			alias: j.alias,
-			on: j.on ? compileSqlFragment(j.on.toFragment()) : undefined,
-		}
+
+		return compileQuery(sqlQuery)
 	})
-
-	const sqlQuery: SqlQuery = {
-		select: selectFragments,
-		from: fromFragment,
-		joins,
-		where: whereFragments,
-		groupBy: state.groupByKeys.map((k) => raw(k)),
-		// Deliberately excluded from tenant evidence: by HAVING time the
-		// rows are already aggregated, so the scan that produced them crossed
-		// tenants no matter what this filters out.
-		having: (state.havingFn ? state.havingFn($) : [])
-			.filter((c): c is NonNullable<typeof c> => c != null)
-			.map((c) => c.toFragment()),
-		orderBy: orderByClause(state.orderBySpecs).map(raw),
-		limit: state.limitValue != null ? raw(String(Math.round(state.limitValue))) : undefined,
-		offset: state.offsetValue != null ? raw(String(Math.round(state.offsetValue))) : undefined,
-		format: options?.skipFormat ? undefined : state.formatValue,
-	}
-
-	let sql = compileQuery(sqlQuery)
 
 	// Prepend CTE definitions
 	if (resolvedCtes.length > 0) {

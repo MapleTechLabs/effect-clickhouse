@@ -18,8 +18,7 @@ optional feature for applications that share tables between tenants.
 The root builder does not manage connections, create tables, run migrations, insert rows, or provide
 an ORM. It does not validate SQL against a live server, choose query plans, enforce authorization,
 or supply retries. Existing ClickHouse tables and your executor own those responsibilities.
-The first npm release is pending; [Getting started](./getting-started.md) includes a source-build
-path and installation instructions for the upcoming release.
+[Getting started](./getting-started.md) covers npm installation and building from source.
 
 ## Start here
 

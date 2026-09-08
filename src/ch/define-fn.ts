@@ -7,7 +7,7 @@
 
 import { Result, Schema } from "effect"
 import { CHNumber } from "./types"
-import { raw, compile } from "../sql/sql-fragment"
+import { compile, lazy } from "../sql/sql-fragment"
 import type { Expr, Condition } from "./expr"
 import { makeExpr, makeUntypedExpr, makeCond, toFragment } from "./expr"
 import type { CHType } from "./types"
@@ -66,8 +66,8 @@ export { makeExpr, makeUntypedExpr, makeCond }
 // compileFnCall — low-level helper for handwritten generic/special functions
 
 export function compileFnCall<R>(name: string, ...args: unknown[]): Expr<R> {
-	const compiled = args.map((a) => compile(toFragment(a))).join(", ")
-	return makeUntypedExpr<R>(raw(`${name}(${compiled})`))
+	const compiled = () => args.map((a) => compile(toFragment(a))).join(", ")
+	return makeUntypedExpr<R>(lazy(() => `${name}(${compiled()})`))
 }
 
 /** `compileFnCall` for a function whose result type is known. */
@@ -76,13 +76,13 @@ export function compileTypedFnCall<R>(
 	schema: Schema.Codec<R, any> | undefined,
 	...args: unknown[]
 ): Expr<R> {
-	const compiled = args.map((a) => compile(toFragment(a))).join(", ")
-	return makeExpr<R>(raw(`${name}(${compiled})`), schema)
+	const compiled = () => args.map((a) => compile(toFragment(a))).join(", ")
+	return makeExpr<R>(lazy(() => `${name}(${compiled()})`), schema)
 }
 
 export function compileFnCallCond(name: string, ...args: unknown[]): Condition {
-	const compiled = args.map((a) => compile(toFragment(a))).join(", ")
-	return makeCond(raw(`${name}(${compiled})`))
+	const compiled = () => args.map((a) => compile(toFragment(a))).join(", ")
+	return makeCond(lazy(() => `${name}(${compiled()})`))
 }
 
 // defineFn — declare a standard ClickHouse function in one line

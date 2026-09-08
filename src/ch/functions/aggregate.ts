@@ -1,7 +1,7 @@
 import { defineFn, compileTypedFnCall, numericResultSchema } from "../define-fn"
 import { QueryBuilderError } from "../errors"
 import { makeExpr } from "../expr"
-import { raw, compile } from "../../sql/sql-fragment"
+import { compile, lazy } from "../../sql/sql-fragment"
 import type { Expr, Condition } from "../expr"
 import { Schema } from "effect"
 import * as T from "../types"
@@ -110,7 +110,7 @@ export const argMaxMerge = <T>(expr: Expr<T>): Expr<T> =>
 
 export function quantile(q: number) {
 	return (expr: Expr<number | null>): Expr<number | null> =>
-		makeExpr(raw(`quantile(${q})(${compile(expr.toFragment())})`), T.nullable(T.float64).schema)
+		makeExpr(lazy(() => `quantile(${q})(${compile(expr.toFragment())})`), T.nullable(T.float64).schema)
 }
 
 /**
@@ -123,7 +123,7 @@ export function quantile(q: number) {
 export function groupUniqArrayIf(maxSize: number) {
 	return <T>(expr: Expr<T>, cond: Condition): Expr<ReadonlyArray<T>> =>
 		makeExpr(
-			raw(
+			lazy(() =>
 				`groupUniqArrayIf(${Math.round(maxSize)})(` +
 					`${compile(expr.toFragment())}, ${compile(cond.toFragment())})`,
 			),
@@ -164,10 +164,10 @@ export function windowFunnel(window: number, mode?: WindowFunnelMode) {
 				message: "windowFunnel requires at least one condition",
 			})
 		}
-		const args = [timestamp.toFragment(), ...conditions.map((c) => c.toFragment())]
+		const args = () => [timestamp.toFragment(), ...conditions.map((c) => c.toFragment())]
 			.map(compile)
 			.join(", ")
-		return makeExpr(raw(`windowFunnel(${params})(${args})`), T.uint8.schema)
+		return makeExpr(lazy(() => `windowFunnel(${params})(${args()})`), T.uint8.schema)
 	}
 }
 
@@ -201,9 +201,9 @@ export function sequenceMatch(pattern: string) {
 				message: "sequenceMatch requires at least one condition",
 			})
 		}
-		const args = [timestamp.toFragment(), ...conditions.map((c) => c.toFragment())]
+		const args = () => [timestamp.toFragment(), ...conditions.map((c) => c.toFragment())]
 			.map(compile)
 			.join(", ")
-		return makeExpr(raw(`sequenceMatch('${pattern}')(${args})`), T.uint8.schema)
+		return makeExpr(lazy(() => `sequenceMatch('${pattern}')(${args()})`), T.uint8.schema)
 	}
 }

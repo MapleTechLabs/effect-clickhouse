@@ -1,6 +1,6 @@
 import { compileFnCall, compileTypedFnCall, defineFn } from "../define-fn"
 import { makeCond } from "../expr"
-import { compile, raw, str } from "../../sql/sql-fragment"
+import { compile, str, lazy } from "../../sql/sql-fragment"
 import type { Condition, Expr } from "../expr"
 import * as T from "../types"
 
@@ -60,7 +60,7 @@ export function match_(haystack: Expr<string>, pattern: string): Expr<number> {
 
 /** `match(haystack, pattern)` as a predicate — see {@link match_}. */
 export function matchCond(haystack: Expr<string>, pattern: string): Condition {
-	return makeCond(raw(`match(${compile(haystack.toFragment())}, ${compile(str(pattern))})`))
+	return makeCond(lazy(() => `match(${compile(haystack.toFragment())}, ${compile(str(pattern))})`))
 }
 
 // Variadic string functions
@@ -84,15 +84,15 @@ export function concat(...exprs: Array<Expr<string> | string>): Expr<string> {
  */
 export function multiSearchAnyCaseInsensitive(haystack: Expr<string>, needles: readonly string[]): Condition {
 	const array = needles.map((needle) => compile(str(needle))).join(", ")
-	return makeCond(raw(`multiSearchAnyCaseInsensitive(${compile(haystack.toFragment())}, [${array}])`))
+	return makeCond(lazy(() => `multiSearchAnyCaseInsensitive(${compile(haystack.toFragment())}, [${array}])`))
 }
 
 export function hasToken(haystack: Expr<string>, token: Expr<string> | string): Condition {
 	const call = compileFnCall<boolean>("hasToken", haystack, token)
-	return makeCond(raw(compile(call.toFragment())))
+	return makeCond(call.toFragment())
 }
 
 export function hasAllTokens(haystack: Expr<string>, tokens: Expr<string> | string): Condition {
 	const call = compileFnCall<boolean>("hasAllTokens", haystack, tokens)
-	return makeCond(raw(compile(call.toFragment())))
+	return makeCond(call.toFragment())
 }

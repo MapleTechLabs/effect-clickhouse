@@ -1,5 +1,5 @@
 import { makeExpr, toFragment } from "../expr"
-import { compile, raw } from "../../sql/sql-fragment"
+import { compile, lazy } from "../../sql/sql-fragment"
 import type { Expr } from "../expr"
 import { schemaOf } from "../define-fn"
 import { QueryBuilderError } from "../errors"
@@ -47,6 +47,21 @@ export function rowsBetween(start: WindowFrameBound, end: WindowFrameBound): Win
 }
 
 export function windowSpec(spec: WindowSpec): CompiledWindowSpec {
+	if (!spec.partitionBy?.length && !spec.orderBy?.length && !spec.frame) {
+		throw new QueryBuilderError({
+			code: "InvalidArguments",
+			message: "windowSpec requires at least one of partitionBy, orderBy or frame",
+		})
+	}
+	return {
+		_brand: "WindowSpec",
+		get sql() {
+			return renderWindowSpec(spec)
+		},
+	}
+}
+
+function renderWindowSpec(spec: WindowSpec): string {
 	const parts: string[] = []
 
 	if (spec.partitionBy && spec.partitionBy.length > 0) {
@@ -62,21 +77,12 @@ export function windowSpec(spec: WindowSpec): CompiledWindowSpec {
 
 	if (spec.frame) parts.push(compileRowsFrame(spec.frame))
 
-	// Same class as `windowFunnel`'s empty condition list: `partitionBy` is
-	// routinely built from a grouping key list, so an empty spec can be data.
-	if (parts.length === 0) {
-		throw new QueryBuilderError({
-			code: "InvalidArguments",
-			message: "windowSpec requires at least one of partitionBy, orderBy or frame",
-		})
-	}
-
-	return { _brand: "WindowSpec", sql: parts.join(" ") }
+	return parts.join(" ")
 }
 
 export function over<T>(expr: Expr<T>, spec: CompiledWindowSpec): Expr<T> {
 	// A window changes which rows feed the value, never how the value decodes.
-	return makeExpr(raw(`${compile(expr.toFragment())} OVER (${spec.sql})`), schemaOf<T>(expr))
+	return makeExpr(lazy(() => `${compile(expr.toFragment())} OVER (${spec.sql})`), schemaOf<T>(expr))
 }
 
 export function lagInFrame<T>(
@@ -85,7 +91,7 @@ export function lagInFrame<T>(
 	defaultValue: T | Expr<T>,
 ): Expr<T> {
 	return makeExpr(
-		raw(
+		lazy(() =>
 			`lagInFrame(${compile(expr.toFragment())}, ${compile(toFragment(offset))}, ${compile(toFragment(defaultValue))})`,
 		),
 		schemaOf<T>(expr),

@@ -7,10 +7,10 @@ or row decoding. [Running a query](./running-queries.md#error-boundaries) separa
 
 | Symptom                                                      | Likely cause                                          | Fix                                                                                                  |
 | ------------------------------------------------------------ | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| npm returns 404 for the builder                              | Its first npm release is pending.                     | Use the source-build path in [Getting started](./getting-started.md#installation-and-compatibility). |
+| npm returns 404 for the builder                              | The package name or configured registry is incorrect.                     | Check `@maple-dev/effect-clickhouse` and your npm registry; see [Getting started](./getting-started.md#installation-and-compatibility). |
 | `Schema.TaggedError is not a function`                       | Effect 3 is installed or resolving ahead of Effect 4. | Install the documented Effect 4 version and inspect the resolved dependency tree.                    |
 | `ERR_REQUIRE_ESM` or an import cannot be loaded by `require` | The builder ships ESM.                                | Use ESM imports and `"type": "module"`, or your bundler's ESM support.                               |
-| A helper exists in source but not in the package             | A deep source import or stale local build.            | Use the four public entry points and rebuild/reinstall your tarball.                                 |
+| A helper exists in source but not in the package             | A deep source import or stale local build.            | Use the seven public entry points and rebuild/reinstall your tarball.                                 |
 | An example's `Events`, `Services`, `CH`, or `T` is undefined | A guide fragment expects the shared schema/imports.   | Start with the complete example and shared `schema.ts`; recipe files include their own imports.      |
 
 ## Compilation failures

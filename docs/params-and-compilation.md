@@ -180,8 +180,7 @@ interface CompiledQuery<Output> {
 | `decodeRows` / `decodeFirstRow` | See [Decoding results](./decoding-results.md)                                            |
 | `encodeRows`                    | The same codec backwards — decoded rows to the wire shape                                |
 
-There is deliberately **no `castRows`**. A bare cast looked type-safe while hiding wire-format
-drift, so it was removed in favour of schema-checked decoding.
+Use `decodeRows` to validate wire values against the row schema.
 
 ## Handwritten SQL
 

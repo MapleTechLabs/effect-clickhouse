@@ -14,9 +14,30 @@ value looks like:
 $.Attributes.eq({ "http.method": "GET" }) // Attributes = map('http.method', 'GET')
 $.Tags.eq(["a", "b"])                     // Tags = ['a', 'b']
 $.Live.eq(true)                           // Live = 1
-$.Note.eq(null)                           // Note = NULL
 $.Timestamp.gte(new Date(...))            // Timestamp >= '2026-01-01 00:00:00'
 ```
+
+### Testing for NULL
+
+`.eq(null)` emits `= NULL`; it does not test whether a value is missing. Use
+`isNull` (or `isNotNull` for present values), declared with `defineCondFn`:
+
+```ts title="null-filter.ts"
+import * as CH from "@maple-dev/effect-clickhouse"
+import * as T from "@maple-dev/effect-clickhouse/types"
+
+const Notes = CH.table("notes", { Note: T.nullable(T.string) })
+const isNull = CH.defineCondFn<[CH.Expr<string | null>]>("isNull")
+export const compiled = CH.compileUnsafe(
+	CH.from(Notes).select("Note").where(($) => [isNull($.Note)]),
+	{},
+)
+console.log(compiled.sql) // SELECT Note AS Note FROM notes WHERE isNull(Note)
+```
+
+See [ClickHouse NULL predicates](https://clickhouse.com/docs/reference/functions/regular-functions/functions-for-nulls#isNull).
+
+### Invalid literals
 
 A value the column cannot hold fails while the SQL is being built:
 

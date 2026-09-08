@@ -118,6 +118,12 @@ with `join_use_nulls=0`, a filter matching the right column's default can retain
 rows from any left-side tenant. The builder conservatively avoids reverse propagation
 through LEFT JOINs.
 
+Scalar and predicate subqueries also contribute their source scope, including through
+functions, arithmetic, boolean conditions, and window specifications. An unscoped inner
+query, or one bound to a different tenant, makes the outer query cross-tenant even when
+the outer table is filtered. An inner filter never substitutes for the outer table's own
+filter. Subqueries supplied as SQL strings are conservatively cross-tenant.
+
 Typed CTEs, FROM-subqueries, and unions inherit their inner scope and bound tenant value.
 A union of `org_a` and `org_b` is cross-tenant even when each branch is individually scoped.
 Apply tenant filters inside each derived query: filtering a projected column outside it
