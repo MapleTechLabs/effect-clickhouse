@@ -13,8 +13,8 @@ import { makeExpr, makeUntypedExpr, makeCond, toFragment } from "./expr"
 import type { CHType } from "./types"
 
 /** The schema an expression decodes with, when it has one. */
-export const schemaOf = <T>(expr: unknown): Schema.Codec<T, any> | undefined =>
-	(expr as { readonly schema?: Schema.Codec<T, any> } | null | undefined)?.schema
+export const schemaOf = <T>(expr: unknown): Schema.Codec<T, unknown> | undefined =>
+	(expr as { readonly schema?: Schema.Codec<T, unknown> } | null | undefined)?.schema
 
 /**
  * The element schema of an array schema, for functions that unnest.
@@ -24,17 +24,17 @@ export const schemaOf = <T>(expr: unknown): Schema.Codec<T, any> | undefined =>
  * `arrayJoin` result.
  */
 export const elementSchema = <T>(
-	schema: Schema.Codec<ReadonlyArray<T>, any> | undefined,
-): Schema.Codec<T, any> | undefined => {
+	schema: Schema.Codec<ReadonlyArray<T>, unknown> | undefined,
+): Schema.Codec<T, unknown> | undefined => {
 	const ast = schema?.ast
 	if (ast?._tag !== "Arrays") return undefined
 	const rest = ast.rest[0]
-	return rest === undefined ? undefined : (Schema.make(rest) as Schema.Codec<T, any>)
+	return rest === undefined ? undefined : (Schema.make(rest) as Schema.Codec<T, unknown>)
 }
 
 /** The first argument that knows how it decodes — for functions that return one
  *  of their inputs unchanged (`min`, `argMax`, `if`, a window). */
-export const schemaOfAny = <T>(...exprs: ReadonlyArray<unknown>): Schema.Codec<T, any> | undefined => {
+export const schemaOfAny = <T>(...exprs: ReadonlyArray<unknown>): Schema.Codec<T, unknown> | undefined => {
 	for (const expr of exprs) {
 		const schema = schemaOf<T>(expr)
 		if (schema !== undefined) return schema
@@ -44,10 +44,10 @@ export const schemaOfAny = <T>(...exprs: ReadonlyArray<unknown>): Schema.Codec<T
 
 /** Combine every possible result, retaining the most precise built-in timestamp encoder. */
 export const mergeResultSchemas = <T>(
-	schemas: ReadonlyArray<Schema.Codec<T, any> | undefined>,
-): Schema.Codec<T, any> | undefined => {
+	schemas: ReadonlyArray<Schema.Codec<T, unknown> | undefined>,
+): Schema.Codec<T, unknown> | undefined => {
 	if (schemas.length === 0 || schemas.some((schema) => schema === undefined)) return undefined
-	const unique = [...new Set(schemas as ReadonlyArray<Schema.Codec<T, any>>)]
+	const unique = [...new Set(schemas as ReadonlyArray<Schema.Codec<T, unknown>>)]
 	// A union encodes through its first matching domain type. DateTime and
 	// DateTime64 share DateTime.Utc, so the seconds encoder must not win over
 	// the millisecond encoder. Nullable/array wrappers retain their member ASTs.
@@ -60,7 +60,7 @@ export const mergeResultSchemas = <T>(
 }
 
 /** SQL nullability is a wire property, including for custom transformed codecs. */
-export const acceptsSqlNull = (schema: Schema.Codec<any, any>): boolean =>
+export const acceptsSqlNull = (schema: Schema.Codec<any, unknown>): boolean =>
 	Result.isSuccess(Schema.decodeUnknownResult(schema)(null))
 
 /**
@@ -70,15 +70,15 @@ export const acceptsSqlNull = (schema: Schema.Codec<any, any>): boolean =>
  * of `x` and `Null`, and dropping the `Null` member is the only way back to `x`.
  */
 export const withoutNull = <T>(
-	schema: Schema.Codec<T | null, any> | undefined,
-): Schema.Codec<T, any> | undefined => {
+	schema: Schema.Codec<T | null, unknown> | undefined,
+): Schema.Codec<T, unknown> | undefined => {
 	const ast = schema?.ast
 	if (ast?._tag !== "Union") return undefined
 	const rest = ast.types.filter((type) => type._tag !== "Null")
 	if (rest.length === ast.types.length || rest.length === 0) return undefined
 	const members = rest.map((type) => Schema.make(type))
 	const only = members.length === 1 ? members[0] : undefined
-	return (only ?? Schema.Union(members)) as Schema.Codec<T, any>
+	return (only ?? Schema.Union(members)) as Schema.Codec<T, unknown>
 }
 
 // Re-export for consumer convenience
@@ -94,7 +94,7 @@ export function compileFnCall<R>(name: string, ...args: unknown[]): Expr<R> {
 /** `compileFnCall` for a function whose result type is known. */
 export function compileTypedFnCall<R>(
 	name: string,
-	schema: Schema.Codec<R, any> | undefined,
+	schema: Schema.Codec<R, unknown> | undefined,
 	...args: unknown[]
 ): Expr<R> {
 	const compiled = () => args.map((a) => compile(toFragment(a))).join(", ")
@@ -124,13 +124,13 @@ export function compileFnCallCond(name: string, ...args: unknown[]): Condition {
  */
 export type FnResult<Args extends unknown[], R> =
 	| CHType<string, R, any>
-	| ((...args: Args) => Schema.Codec<R, any> | undefined)
+	| ((...args: Args) => Schema.Codec<R, unknown> | undefined)
 
 const resultSchema = <Args extends unknown[], R>(
 	result: FnResult<Args, R>,
 	args: Args,
-): Schema.Codec<R, any> | undefined =>
-	typeof result === "function" ? result(...args) : (result.schema as Schema.Codec<R, any>)
+): Schema.Codec<R, unknown> | undefined =>
+	typeof result === "function" ? result(...args) : (result.schema as Schema.Codec<R, unknown>)
 
 /**
  * Declare a ClickHouse function.
@@ -164,14 +164,14 @@ export function defineUntypedFn<Args extends unknown[], R = unknown>(
 /** The result decodes as argument `index` does — `min`, `argMax`, a window. */
 export const sameAs =
 	<Args extends unknown[], R>(index: number) =>
-	(...args: Args): Schema.Codec<R, any> | undefined =>
+	(...args: Args): Schema.Codec<R, unknown> | undefined =>
 		schemaOf<R>(args[index])
 
 /** The result decodes as the first argument that knows how it decodes —
  *  `coalesce`, `if`, `least`, where any arm describes the whole. */
 export const firstTyped =
 	<Args extends unknown[], R>() =>
-	(...args: Args): Schema.Codec<R, any> | undefined =>
+	(...args: Args): Schema.Codec<R, unknown> | undefined =>
 		schemaOfAny<R>(...args)
 
 /**
@@ -191,7 +191,7 @@ export const firstTyped =
  */
 export const firstTypedNonNull =
 	<Args extends unknown[], R>() =>
-	(...args: Args): Schema.Codec<R, any> | undefined => {
+	(...args: Args): Schema.Codec<R, unknown> | undefined => {
 		const schemas = args.map((arg) => schemaOf<R>(arg))
 		const merged = mergeResultSchemas(schemas)
 		if (!merged) return undefined
@@ -205,13 +205,13 @@ export const firstTypedNonNull =
  *  `arrayElement`. */
 export const elementOf =
 	<Args extends unknown[], R>(index: number) =>
-	(...args: Args): Schema.Codec<R, any> | undefined =>
+	(...args: Args): Schema.Codec<R, unknown> | undefined =>
 		elementSchema<R>(schemaOf<ReadonlyArray<R>>(args[index]))
 
 /** The result is an array of argument `index` — `groupArray`, `groupUniqArray`. */
 export const arrayOfArg =
 	<Args extends unknown[], R>(index: number) =>
-	(...args: Args): Schema.Codec<ReadonlyArray<R>, any> | undefined => {
+	(...args: Args): Schema.Codec<ReadonlyArray<R>, unknown> | undefined => {
 		const element = schemaOf<R>(args[index])
 		return element ? Schema.Array(element) : undefined
 	}
@@ -226,7 +226,7 @@ export function defineCondFn<Args extends unknown[]>(name: string): (...args: Ar
 }
 
 /** Numeric functions preserve SQL NULL while promoting the numeric type. */
-export const numericResultSchema = <T>(expr: Expr<T>): Schema.Codec<number | Extract<T, null>, any> =>
+export const numericResultSchema = <T>(expr: Expr<T>): Schema.Codec<number | Extract<T, null>, unknown> =>
 	(expr.schema !== undefined && Result.isSuccess(Schema.decodeUnknownResult(expr.schema)(null))
 		? Schema.NullOr(CHNumber)
-		: CHNumber) as Schema.Codec<number | Extract<T, null>, any>
+		: CHNumber) as Schema.Codec<number | Extract<T, null>, unknown>

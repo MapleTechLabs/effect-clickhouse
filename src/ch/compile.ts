@@ -221,7 +221,7 @@ export type CompiledQuery<
  * the cost is that a caller assembling one out of generic `Schema.Struct.Fields`
  * has to carry the same constraint on its own type parameter.
  */
-export type CompiledQueryRowSchema<Output> = Schema.Codec<Output, any, never, never>
+export type CompiledQueryRowSchema<Output> = Schema.Codec<Output, unknown, never, never>
 
 /**
  * A compiled query, or the unrun compile that produces one.

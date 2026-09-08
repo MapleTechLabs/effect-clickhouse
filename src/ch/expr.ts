@@ -49,7 +49,7 @@ export interface Expr<TSType> {
 	 * without anyone writing a schema. Absent for `rawExpr`/`dynamicColumn`,
 	 * where there is nothing to read it from.
 	 */
-	readonly schema?: Schema.Codec<TSType, any>
+	readonly schema?: Schema.Codec<TSType, unknown>
 	toFragment(): SqlFragment
 
 	// Comparison — returns Condition. `Expr<TSType>` is listed alongside the

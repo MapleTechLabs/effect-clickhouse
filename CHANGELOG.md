@@ -2,6 +2,9 @@
 
 ## 0.1.1 — unreleased
 
+- Preserve `arrayFilter` element types, reject non-array inputs and invalid
+  funnel/sequence timestamp types, and expose erased codec representations as
+  `unknown` instead of `any`.
 - Include scalar and predicate subqueries in tenant-scope inference, preserving
   scope through expression composition. Handwritten subquery strings are
   conservatively classified as cross-tenant.

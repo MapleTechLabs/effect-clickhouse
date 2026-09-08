@@ -3,7 +3,7 @@ import { QueryBuilderError } from "../errors"
 import { makeExpr } from "../expr"
 import { compile, lazy } from "../../sql/sql-fragment"
 import type { Expr, Condition } from "../expr"
-import { Schema } from "effect"
+import { type DateTime, Schema } from "effect"
 import * as T from "../types"
 
 import { arrayOfArg, sameAs, schemaOf } from "../define-fn"
@@ -157,7 +157,7 @@ export type WindowFunnelMode = "strict_order" | "strict_deduplication" | "strict
  */
 export function windowFunnel(window: number, mode?: WindowFunnelMode) {
 	const params = mode === undefined ? `${Math.round(window)}` : `${Math.round(window)}, '${mode}'`
-	return (timestamp: Expr<any>, ...conditions: ReadonlyArray<Condition>): Expr<number> => {
+	return (timestamp: Expr<number | string | DateTime.Utc>, ...conditions: ReadonlyArray<Condition>): Expr<number> => {
 		// Reported, not thrown: the number of conditions is the number of steps a
 		// funnel has, and that count comes from data as often as from source.
 		if (conditions.length === 0) {
@@ -183,7 +183,7 @@ export function windowFunnel(window: number, mode?: WindowFunnelMode) {
  * user input, so only quote-free literals are accepted.
  */
 export function sequenceMatch(pattern: string) {
-	return (timestamp: Expr<any>, ...conditions: ReadonlyArray<Condition>): Expr<number> => {
+	return (timestamp: Expr<number | string | DateTime.Utc>, ...conditions: ReadonlyArray<Condition>): Expr<number> => {
 		// An injection guard, so it reports rather than crashes: the pattern is
 		// embedded verbatim, and "not user input" is a claim about the caller that
 		// the caller is exactly who might get wrong.

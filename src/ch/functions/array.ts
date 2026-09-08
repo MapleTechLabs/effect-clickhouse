@@ -29,8 +29,8 @@ export function arrayStringConcat(
 	)
 }
 
-export function arrayFilter(fn: string, arr: Expr<any>): Expr<any> {
-	return makeExpr(lazy(() => `arrayFilter(${fn}, ${compile(arr.toFragment())})`), schemaOf(arr))
+export function arrayFilter<T>(fn: string, arr: Expr<ReadonlyArray<T>>): Expr<ReadonlyArray<T>> {
+	return makeExpr(lazy(() => `arrayFilter(${fn}, ${compile(arr.toFragment())})`), schemaOf<ReadonlyArray<T>>(arr))
 }
 
 /** `arrayJoin` unnests, so the row value is one element of the array. */

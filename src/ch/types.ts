@@ -30,7 +30,7 @@ export interface CHType<Tag extends string, A, I = A> {
 	 * `DateTime.Utc`, a `Date`, or the string form, and all three write the same
 	 * `'YYYY-MM-DD hh:mm:ss'`.
 	 */
-	readonly literalSchema: Schema.Codec<any, any>
+	readonly literalSchema: Schema.Codec<unknown, unknown>
 	/**
 	 * The type this one wraps: an `Array`'s element, a `Map`'s value, a
 	 * `Nullable`'s inner type. Absent for scalars.
@@ -41,7 +41,7 @@ export interface CHType<Tag extends string, A, I = A> {
 	 * record AST is a different shape per Effect version. Subscripting a Map
 	 * (`$.Attrs.get(k)`) needs `V` to know how the result decodes.
 	 */
-	readonly element?: CHType<string, any, any>
+	readonly element?: CHType<string, unknown, unknown>
 	readonly _phantom?: A
 }
 
@@ -49,8 +49,8 @@ const chType = <const Tag extends string, A, I>(
 	_tag: Tag,
 	sql: string,
 	schema: Schema.Codec<A, I>,
-	literalSchema: Schema.Codec<any, any> = schema,
-	element?: CHType<string, any, any>,
+	literalSchema: Schema.Codec<unknown, unknown> = schema,
+	element?: CHType<string, unknown, unknown>,
 ): CHType<Tag, A, I> => ({
 	_tag,
 	sql,
@@ -212,7 +212,7 @@ export type CHBool = CHType<"Bool", boolean, boolean | number>
  * a branded column: `CHType` is invariant in its decoded type, so
  * `custom("String", OrgId)` is not a `CHType<"String", string>`.
  */
-export type CHStringLike = CHType<"String", any, any>
+export type CHStringLike = CHType<"String", unknown, unknown>
 
 /**
  * The same columns left as the strings ClickHouse sends.
@@ -333,7 +333,7 @@ export const custom = <const Sql extends string, A, I>(
 	sql: Sql,
 	schema: Schema.Codec<A, I>,
 	/** Only when comparisons accept more than the column decodes to. */
-	literalSchema?: Schema.Codec<any, any>,
+	literalSchema?: Schema.Codec<unknown, unknown>,
 ): CHType<Sql, A, I> => chType(sql, sql, schema, literalSchema)
 
 /**
