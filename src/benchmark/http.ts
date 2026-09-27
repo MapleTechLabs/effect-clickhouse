@@ -14,10 +14,10 @@ export interface HttpConfig {
 }
 
 export const httpConfigFromEnv = Config.all({
-	url: Config.string("CLICKHOUSE_URL"),
-	user: Config.string("CLICKHOUSE_USER").pipe(Config.withDefault("default")),
-	password: Config.redacted("CLICKHOUSE_PASSWORD").pipe(Config.withDefault(Redacted.make(""))),
-	database: Config.string("CLICKHOUSE_DATABASE").pipe(Config.withDefault("default")),
+	url: Config.String("CLICKHOUSE_URL"),
+	user: Config.String("CLICKHOUSE_USER").pipe(Config.withDefault("default")),
+	password: Config.Redacted("CLICKHOUSE_PASSWORD").pipe(Config.withDefault(Redacted.make(""))),
+	database: Config.String("CLICKHOUSE_DATABASE").pipe(Config.withDefault("default")),
 }).pipe(Effect.map((config): HttpConfig => ({ ...config, password: Redacted.value(config.password) })))
 
 export const decodeJson = <A>(text: string, schema: Schema.Decoder<A>) =>

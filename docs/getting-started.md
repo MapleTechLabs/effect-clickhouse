@@ -7,16 +7,16 @@ Build and decode your first query without connecting to a database. Then follow
 
 This is an ESM-only TypeScript package built on **Effect 4**. You do not need an
 Effect application: `Effect.runPromise` lets you use it from ordinary async code.
-These examples are checked against Effect `4.0.0-rc.112` and the builder in this repository.
-The package declares `effect >=4.0.0-rc.111 <5` as a peer dependency; Effect 3 is incompatible.
+These examples are checked against Effect `4.0.0-rc.117` and the builder in this repository.
+The package declares `effect >=4.0.0-rc.113 <5` as a peer dependency; Effect 3 is incompatible.
 
 Install from npm with its Effect 4 peer dependency:
 
 ```sh
-npm install @maple-dev/effect-clickhouse "effect@>=4.0.0-rc.112 <5"
+npm install @maple-dev/effect-clickhouse "effect@>=4.0.0-rc.113 <5"
 ```
 
-The recommended range accepts Effect `4.0.0-rc.112` and newer releases in the
+The recommended range accepts Effect `4.0.0-rc.113` and newer releases in the
 `4.0.0` prerelease series, plus stable Effect 4 releases. It excludes Effect 3 and 5.
 Quote the range to prevent shell redirection. The exact version above records the
 version used to check these examples; it is not an installation pin.
@@ -34,7 +34,7 @@ bun pm pack
 Install the resulting `.tgz` into your own project with its peer dependency:
 
 ```sh
-npm install /absolute/path/to/the-generated-package.tgz "effect@>=4.0.0-rc.112 <5"
+npm install /absolute/path/to/the-generated-package.tgz "effect@>=4.0.0-rc.113 <5"
 ```
 
 Keep the Effect 4 range explicit when installing. Use an ESM project

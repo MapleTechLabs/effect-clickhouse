@@ -8,10 +8,10 @@ column types already assume.
 ## A complete client example
 
 For Node.js or Bun, install Effect's ClickHouse client separately. Use the same Effect 4
-release as your `effect` dependency; this example is checked against `4.0.0-rc.112`:
+release as your `effect` dependency; this example is checked against `4.0.0-rc.117`:
 
 ```sh
-npm install effect@4.0.0-rc.112 @effect/sql-clickhouse@4.0.0-rc.112
+npm install effect@4.0.0-rc.117 @effect/sql-clickhouse@4.0.0-rc.117
 ```
 
 This example reads five rows from ClickHouse's built-in `system.numbers` table. It creates no
@@ -25,9 +25,9 @@ import * as CH from "@maple-dev/effect-clickhouse"
 import * as T from "@maple-dev/effect-clickhouse/types"
 
 const ClickHouseLive = ClickhouseClient.layerConfig({
-	url: Config.string("CLICKHOUSE_URL").pipe(Config.withDefault("http://localhost:8123")),
-	username: Config.string("CLICKHOUSE_USERNAME").pipe(Config.withDefault("default")),
-	password: Config.redacted("CLICKHOUSE_PASSWORD").pipe(
+	url: Config.String("CLICKHOUSE_URL").pipe(Config.withDefault("http://localhost:8123")),
+	username: Config.String("CLICKHOUSE_USERNAME").pipe(Config.withDefault("default")),
+	password: Config.Redacted("CLICKHOUSE_PASSWORD").pipe(
 		Config.withDefault(Redacted.make("")),
 		Config.map(Redacted.value),
 	),

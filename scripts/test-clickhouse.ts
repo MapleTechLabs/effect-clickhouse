@@ -5,7 +5,7 @@ import { check, runCommand } from "./release-support"
 
 const release = process.argv.includes("--release")
 const program = Effect.gen(function* () {
-	const endpoint = yield* Config.string("EFFECT_CLICKHOUSE_TEST_URL").pipe(Config.withDefault(""))
+	const endpoint = yield* Config.String("EFFECT_CLICKHOUSE_TEST_URL").pipe(Config.withDefault(""))
 	yield* check(
 		endpoint.trim().length > 0,
 		"live-configuration",

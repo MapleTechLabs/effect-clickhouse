@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.3
+
+- Require Effect `>=4.0.0-rc.113`. The benchmark HTTP config uses the renamed
+  `Config.String` / `Config.Redacted` constructors; on rc.113+ the old
+  lowercase names threw `Config.string is not a function` at import.
+
 ## 0.1.2 — unreleased
 
 - Preserve `arrayFilter` element types and nullability through selected rows,
