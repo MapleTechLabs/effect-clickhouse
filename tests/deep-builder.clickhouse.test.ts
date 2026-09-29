@@ -30,14 +30,14 @@ it.layer(FetchHttpClient.layer)("builder identity regressions", (it) => {
 			expect((yield* execute(compiled)).rows).toEqual([{ rows: 1 }])
 		}))
 
-		it.effect("accepts JSON null when arithmetic overflows", () => Effect.gen(function* () {
+		it.effect("decodes arithmetic overflow as NaN", () => Effect.gen(function* () {
 			const one = CH.table("system.one", {})
 			const compiled = CH.compileUnsafe(CH.from(one).select(() => ({
 				added: CH.lit(1e308).add(1e308),
 				subtracted: CH.lit(-1e308).sub(1e308),
 				multiplied: CH.lit(1e308).mul(2),
 			})), {})
-			expect((yield* execute(compiled)).rows).toEqual([{ added: null, subtracted: null, multiplied: null }])
+			expect((yield* execute(compiled)).rows).toEqual([{ added: Number.NaN, subtracted: Number.NaN, multiplied: Number.NaN }])
 		}))
 	})
 })

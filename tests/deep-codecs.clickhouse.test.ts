@@ -32,7 +32,7 @@ it.layer(FetchHttpClient.layer)("composed codecs against ClickHouse", (it) => {
 				filtered: CH.sumIf(CH.lit(1e308), CH.lit(1).eq(1)),
 				parsed: CH.toFloat64OrZero(CH.lit("1e400")),
 			})), {})
-			expect((yield* execute(compiled)).rows).toEqual([{ total: null, filtered: null, parsed: null }])
+			expect((yield* execute(compiled)).rows).toEqual([{ total: Number.NaN, filtered: Number.NaN, parsed: Number.NaN }])
 		}))
 
 		it.effect("normalizes zoned seconds params and retains conditional precision", () => Effect.gen(function* () {

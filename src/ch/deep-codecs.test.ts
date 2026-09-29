@@ -49,11 +49,13 @@ describe("composed result codecs", () => {
 		expect(decode(CH.toString(CH.lit(1)), "1")).toBe("1")
 	})
 
-	it("decodes numeric overflow and nonfinite string parsing as JSON null", () => {
-		for (const expr of [CH.sum(CH.lit(1e308)), CH.sumIf(CH.lit(1e308), CH.lit(1).eq(1)), CH.toFloat64OrZero(CH.lit("Inf"))]) {
-			expect(decode(expr, null)).toBeNull()
+	it("decodes numeric overflow and nonfinite string parsing as NaN", () => {
+		const big = CH.lit(1e308)
+		for (const expr of [CH.sum(big), CH.sumIf(big, CH.lit(1).eq(1)), CH.toFloat64OrZero(CH.lit("Inf")), big.add(big), big.mul(10)]) {
+			expect(decode(expr, null)).toBeNaN()
 			expect(decode(expr, 1)).toBe(1)
 		}
+		expect(decode(CH.sum(CH.nullIf(CH.lit(1), 1)), null)).toBeNull()
 	})
 
 	it("normalizes timezone offsets before flooring timestamp literals", () => {

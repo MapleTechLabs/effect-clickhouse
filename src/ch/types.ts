@@ -70,6 +70,21 @@ export const CHNumber: Schema.Codec<number, number | string> = Schema.Union([
 	Schema.FiniteFromString,
 ])
 
+/**
+ * A Float64 result that can overflow (`sum`, `+`, `toFloat64OrZero('1e400')`).
+ * JSON writes `inf`/`nan` as `null`, which here decodes as `NaN`, so a
+ * non-Nullable result stays `number`.
+ */
+export const CHFloatResult: Schema.Codec<number, number | string | null> = Schema.Union([
+	CHNumber,
+	Schema.Null.pipe(
+		Schema.decodeTo(Schema.Number, {
+			decode: SchemaGetter.transform(() => Number.NaN),
+			encode: SchemaGetter.transform(() => null),
+		}),
+	),
+])
+
 /** ClickHouse `Bool` arrives as `true`/`false`, but `UInt8` flags as `1`/`0`. */
 const CHBoolean: Schema.Codec<boolean, boolean | number> = Schema.Union([
 	// Numeric arm first: union order is encode order, and ClickHouse compares a

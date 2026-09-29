@@ -6,7 +6,7 @@
 // 3. makeExpr / makeCond (from expr.ts) — escape hatch for custom SQL syntax
 
 import { Result, Schema, type SchemaAST } from "effect"
-import { CHNumber, dateTime64 } from "./types"
+import { CHFloatResult, CHNumber, dateTime64 } from "./types"
 import { compile, lazy } from "../sql/sql-fragment"
 import type { Expr, Condition } from "./expr"
 import { makeExpr, makeUntypedExpr, makeCond, toFragment } from "./expr"
@@ -230,3 +230,10 @@ export const numericResultSchema = <T>(expr: Expr<T>): Schema.Codec<number | Ext
 	(expr.schema !== undefined && Result.isSuccess(Schema.decodeUnknownResult(expr.schema)(null))
 		? Schema.NullOr(CHNumber)
 		: CHNumber) as Schema.Codec<number | Extract<T, null>, unknown>
+
+/** Like {@link numericResultSchema} for results that can overflow to `inf`:
+ *  a non-Nullable result decodes the JSON `null` as `NaN`. */
+export const overflowResultSchema = <T>(expr: Expr<T>): Schema.Codec<number | Extract<T, null>, unknown> =>
+	(expr.schema !== undefined && Result.isSuccess(Schema.decodeUnknownResult(expr.schema)(null))
+		? Schema.NullOr(CHNumber)
+		: CHFloatResult) as Schema.Codec<number | Extract<T, null>, unknown>

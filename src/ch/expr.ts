@@ -9,7 +9,7 @@
 import { DateTime, Result, Schema } from "effect"
 import type { SqlFragment } from "../sql/sql-fragment"
 import { raw, str, compile, as_ as sqlAs, lazy } from "../sql/sql-fragment"
-import { chDateTimeLiteral, CHNumber, string as chString, type CHType, type InferTS } from "./types"
+import { chDateTimeLiteral, CHFloatResult, CHNumber, string as chString, type CHType, type InferTS } from "./types"
 import { encodeColumnLiteral } from "./literal"
 import { markTenantColumn, markTenantPredicate, tenantColumnOf, tenantPredicatesOf } from "./tenant"
 
@@ -80,15 +80,15 @@ export interface Expr<TSType> {
 	mul<R extends number | null>(
 		this: Expr<number | null>,
 		n: R | Expr<R>,
-	): Expr<number | null>
+	): Expr<number | Extract<TSType | R, null>>
 	add<R extends number | null>(
 		this: Expr<number | null>,
 		n: R | Expr<R>,
-	): Expr<number | null>
+	): Expr<number | Extract<TSType | R, null>>
 	sub<R extends number | null>(
 		this: Expr<number | null>,
 		n: R | Expr<R>,
-	): Expr<number | null>
+	): Expr<number | Extract<TSType | R, null>>
 	mod<R extends number | null>(this: Expr<number | null>, n: R | Expr<R>): Expr<Quotient<TSType, R>>
 }
 
@@ -184,14 +184,15 @@ const arith = <Result>(
 	// keeps the strict codec — the same rule `Quotient` applies to the type.
 	const safeDivisor = typeof rhs === "number" && Number.isFinite(rhs) && Math.abs(rhs) >= 1
 	const nullable =
-		op === "+" || op === "-" || op === "*" ||
 		((op === "/" || op === "%") && !safeDivisor) ||
 		rhs === null ||
 		acceptsNull(lhsSchema) ||
 		acceptsNull(rhsSchema)
+	// `+`, `-`, `*` can overflow a Float64 to `inf`, sent as JSON null: NaN.
+	const overflows = op === "+" || op === "-" || op === "*"
 	return makeExpr(
 		lazy(() => `${compile(lhs)} ${op} ${compile(toFragment(rhs))}`),
-		(nullable ? Schema.NullOr(CHNumber) : CHNumber) as Schema.Codec<Result, any>,
+		(nullable ? Schema.NullOr(CHNumber) : overflows ? CHFloatResult : CHNumber) as Schema.Codec<Result, any>,
 	)
 }
 
@@ -260,11 +261,11 @@ export function makeExpr<T>(
 		// wire form either backend can send.
 		div: <R extends number | null>(n: R | Expr<R>) => arith<Quotient<T, R>>(fragment, "/", n, schema),
 		mul: <R extends number | null>(n: R | Expr<R>) =>
-			arith<number | null>(fragment, "*", n, schema),
+			arith<number | Extract<T | R, null>>(fragment, "*", n, schema),
 		add: <R extends number | null>(n: R | Expr<R>) =>
-			arith<number | null>(fragment, "+", n, schema),
+			arith<number | Extract<T | R, null>>(fragment, "+", n, schema),
 		sub: <R extends number | null>(n: R | Expr<R>) =>
-			arith<number | null>(fragment, "-", n, schema),
+			arith<number | Extract<T | R, null>>(fragment, "-", n, schema),
 		mod: <R extends number | null>(n: R | Expr<R>) => arith<Quotient<T, R>>(fragment, "%", n, schema),
 	}
 	return self

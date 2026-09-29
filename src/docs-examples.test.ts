@@ -266,7 +266,7 @@ describe("docs/expressions.md", () => {
 			// The guard is in the SQL, so the column is a number again.
 			expect(Exit.isFailure(yield* Effect.exit(guarded.decodeRows([{ perMs: null }])))).toBe(true)
 
-			// Arithmetic can overflow finite inputs; ClickHouse emits JSON null.
+			// Arithmetic can overflow finite inputs; ClickHouse's JSON null decodes as NaN.
 			const added = compileCHUnsafe(
 				CH.from(Events)
 					.select(($) => ({ total: CH.count().add(CH.sum($.DurationMs)) }))

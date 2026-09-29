@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.4
+
+- Restore the non-null result types of `sum`, `sumIf`, `toFloat64OrZero`, `.add()`,
+  `.sub()`, and `.mul()` that 0.1.1 widened to `number | null`. A non-finite result, which
+  ClickHouse JSON sends as `null`, now decodes as `NaN` instead. Results over SQL Nullable
+  inputs still decode `null` as `null`.
+
 ## 0.1.3
 
 - Require Effect `>=4.0.0-rc.113`. The benchmark HTTP config uses the renamed

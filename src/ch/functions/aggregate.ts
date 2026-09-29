@@ -1,4 +1,4 @@
-import { defineFn, compileTypedFnCall, numericResultSchema } from "../define-fn"
+import { defineFn, compileTypedFnCall, numericResultSchema, overflowResultSchema } from "../define-fn"
 import { QueryBuilderError } from "../errors"
 import { makeExpr } from "../expr"
 import { compile, lazy } from "../../sql/sql-fragment"
@@ -18,10 +18,10 @@ const arraySchemaOf = <T>(expr: unknown) => {
 
 export const count = defineFn<[], number>("count", T.uint64)
 export const avg = defineFn<[Expr<number | null>], number | null>("avg", T.nullable(T.float64))
-// A finite Float64 input can overflow during accumulation. JSON encodes the
-// resulting infinity as null, even when the input is not SQL Nullable.
-export const sum = <N extends number | null>(expr: Expr<N>): Expr<number | null> =>
-	compileTypedFnCall("sum", T.nullable(T.float64).schema, expr)
+// A finite Float64 input can overflow during accumulation; the resulting
+// infinity decodes as NaN (see `overflowResultSchema`).
+export const sum = <N extends number | null>(expr: Expr<N>): Expr<number | Extract<N, null>> =>
+	compileTypedFnCall("sum", overflowResultSchema(expr), expr)
 
 // Condition-taking aggregates
 
@@ -29,7 +29,7 @@ export const countIf = defineFn<[Condition], number>("countIf", T.uint64)
 export const sumIf = <N extends number | null>(
 	expr: Expr<N>,
 	condition: Condition,
-): Expr<number | null> => compileTypedFnCall("sumIf", T.nullable(T.float64).schema, expr, condition)
+): Expr<number | Extract<N, null>> => compileTypedFnCall("sumIf", overflowResultSchema(expr), expr, condition)
 export const avgIf = defineFn<[Expr<number | null>, Condition], number | null>("avgIf", T.nullable(T.float64))
 export const maxIf = <N extends number | null>(
 	expr: Expr<N>,

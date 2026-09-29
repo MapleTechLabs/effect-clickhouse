@@ -1,6 +1,6 @@
 {
 	"name": "@maple-dev/effect-clickhouse",
-	"version": "0.1.3",
+	"version": "0.1.4",
 	"description": "Type-safe ClickHouse queries, result decoding, and reproducible benchmarks for Effect and TypeScript",
 	"keywords": [
 		"clickhouse",
