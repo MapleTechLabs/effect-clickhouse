@@ -19,6 +19,7 @@ const positional: Dialect = {
 // Standard SQL strings: a quote is doubled, a backslash is literal text.
 const standardQuote = (value: string) => `'${value.replace(/'/g, "''")}'`
 const literalDialect = (name: string, quoteString: (value: string) => string): Dialect => ({
+	...CH.clickhouseDialect,
 	name,
 	quoteString,
 	literal: (value, context) => {
@@ -180,5 +181,42 @@ describe("dialect literal syntax", () => {
 		expect(compileCHUnsafe(smuggle, { orgId: "o" }, { dialect: standard }).sql).toContain(
 			"Service = '_' || '_PARAM_string_orgId__'",
 		)
+	})
+})
+
+describe("dialect identifiers and clauses", () => {
+	const quoted: Dialect = {
+		...CH.clickhouseDialect,
+		name: "quoted",
+		quoteIdent: (name) => `"${name.replace(/"/g, '""')}"`,
+		clauses: { format: false, derivedTableAlias: true },
+	}
+	const services = CH.table("db.services", { OrgId: CH.string, Service: CH.string }, { tenantColumn: "OrgId" })
+
+	it("quotes columns, qualifiers, tables, aliases, group and order keys", () => {
+		const query = CH.from(events)
+			.innerJoin(services, "s", (main, s) => main.Service.eq(s.Service))
+			.select(($) => ({ service: $.s.Service, count: CH.count() }))
+			.where(($) => [$.OrgId.eq("o")])
+			.groupBy("service")
+			.orderBy(["count", "desc"])
+		const { sql } = compileCHUnsafe(query, {}, { dialect: quoted })
+		expect(sql).toContain(`"s"."Service" AS "service"`)
+		expect(sql).toContain(`INNER JOIN "db"."services" AS "s" ON "events"."Service" = "s"."Service"`)
+		expect(sql).toContain(`FROM "events"`)
+		expect(sql).toContain(`WHERE "events"."OrgId" = 'o'`)
+		expect(sql).toContain(`GROUP BY "service"`)
+		expect(sql).toContain(`ORDER BY "count" DESC`)
+	})
+
+	it("aliases a wrapped union and refuses FORMAT where the dialect has neither", () => {
+		const branch = CH.from(events)
+			.select(($) => ({ count: $.Count }))
+			.where(($) => [$.OrgId.eq("o")])
+		const union = compileUnionUnsafe(CH.unionAll(branch, branch).orderBy(["count", "asc"]), {}, { dialect: quoted })
+		expect(union.sql).toContain(`) AS "__union"\nORDER BY "count" ASC`)
+
+		expect(() => compileCHUnsafe(branch.format("JSON"), {}, { dialect: quoted })).toThrow(/no FORMAT clause/)
+		expect(compileCHUnsafe(branch.format("JSON"), {}).sql).toMatch(/FORMAT JSON$/)
 	})
 })

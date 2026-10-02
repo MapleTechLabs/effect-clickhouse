@@ -12,7 +12,7 @@ import type { CHQuery, CHQueryState } from "./query"
 import type { CHUnionQuery } from "./union"
 import { createQualifiedColumnAccessor, createJoinedColumnAccessor, sourceAlias } from "./query"
 import { aliased, columnTypeOf } from "./expr"
-import { raw, ident, compile as compileSqlFragment } from "../sql/sql-fragment"
+import { raw, identPath, quoteIdent, quoteIdentPath, compile as compileSqlFragment } from "../sql/sql-fragment"
 import { splitTerminalClauses } from "../sql/terminal-clauses"
 import { compileQuery, type SqlQuery } from "../sql/sql-query"
 import { PARAM_MARKER_PREFIX, PARAM_PLACEHOLDER_PATTERN, paramSchema, type ParamKind } from "./param"
@@ -65,8 +65,22 @@ const orderByClause = (specs: ReadonlyArray<[string, "asc" | "desc"]>): Array<st
 				message: `CHQuery: orderBy() direction must be "asc" or "desc", got ${JSON.stringify(direction)}`,
 			})
 		}
-		return `${column} ${direction.toUpperCase()}`
+		return `${quoteIdent(column)} ${direction.toUpperCase()}`
 	})
+
+/** `.format()`'s value, refused for a dialect that has no `FORMAT` clause:
+ *  dropping it would hand the caller rows in a shape they did not ask for. A
+ *  defect, because the format is written in the query definition. */
+const formatClause = (format: string | undefined): string | undefined => {
+	if (format === undefined) return undefined
+	const dialect = currentDialect()
+	if (!dialect.clauses.format) {
+		throw new QueryBuilderDefect({
+			message: `CHQuery: format(${JSON.stringify(format)}) has no meaning for the ${dialect.name} dialect, which has no FORMAT clause`,
+		})
+	}
+	return format
+}
 
 // CompiledQuery — bundles the SQL string with its output type so consumers
 // never need to cast manually.
@@ -654,16 +668,17 @@ function compileInner<
 			enclosingCtes: visibleCtes,
 		})
 		fromSource = sourceOf(inner)
-		fromFragment = raw(`(${inner.sql}) AS ${state.fromQueryAlias}`)
+		fromFragment = raw(`(${inner.sql}) AS ${quoteIdent(state.fromQueryAlias ?? "")}`)
 	} else if (state.fromUnion) {
 		const inner = compileUnionInner(state.fromUnion, params, { deferParams, nested: true, enclosingCtes: visibleCtes })
 		fromSource = sourceOf(inner)
-		fromFragment = raw(`(\n${splitTerminalClauses(inner.sql).body}\n) AS ${state.fromQueryAlias}`)
+		const body = currentDialect().clauses.format ? splitTerminalClauses(inner.sql).body : inner.sql
+		fromFragment = raw(`(\n${body}\n) AS ${quoteIdent(state.fromQueryAlias ?? "")}`)
 	} else {
 		fromSource = sourceForTable(state.tableName, mainColumn)
 		fromFragment = mainAlias !== state.tableName
-			? raw(`${state.tableName} AS ${mainAlias}`)
-			: ident(state.tableName)
+			? raw(`${quoteIdentPath(state.tableName)} AS ${quoteIdentPath(mainAlias)}`)
+			: identPath(state.tableName)
 	}
 
 	const sources: TenantSource[] = [fromSource]
@@ -696,7 +711,7 @@ function compileInner<
 				tableSql = `(${compiled.sql})`
 				source = sourceOf(compiled)
 			} else if (j.tableName) {
-				tableSql = j.tableName
+				tableSql = quoteIdentPath(j.tableName)
 				source = sourceForTable(
 					j.tableName,
 					j.tenantColumn === undefined ? undefined : `${j.alias}.${j.tenantColumn}`,
@@ -722,7 +737,7 @@ function compileInner<
 			return {
 				type: j.type,
 				table: tableSql,
-				alias: j.alias,
+				alias: quoteIdent(j.alias),
 				on: on ? compileSqlFragment(on.toFragment()) : undefined,
 			}
 		})
@@ -732,7 +747,7 @@ function compileInner<
 			from: fromFragment,
 			joins,
 			where: whereFragments,
-			groupBy: state.groupByKeys.map((k) => raw(k)),
+			groupBy: state.groupByKeys.map((k) => raw(quoteIdent(k))),
 			// Deliberately excluded from tenant evidence: by HAVING time the
 			// rows are already aggregated, so the scan that produced them crossed
 			// tenants no matter what this filters out.
@@ -742,7 +757,7 @@ function compileInner<
 			orderBy: orderByClause(state.orderBySpecs).map(raw),
 			limit: state.limitValue != null ? raw(String(Math.round(state.limitValue))) : undefined,
 			offset: state.offsetValue != null ? raw(String(Math.round(state.offsetValue))) : undefined,
-			format: options?.skipFormat ? undefined : state.formatValue,
+			format: options?.skipFormat ? undefined : formatClause(state.formatValue),
 		}
 
 		return compileQuery(sqlQuery)
@@ -750,7 +765,7 @@ function compileInner<
 
 	// Prepend CTE definitions
 	if (resolvedCtes.length > 0) {
-		const cteDefs = resolvedCtes.map((c) => `${c.name} AS (\n${c.sql}\n)`).join(",\n")
+		const cteDefs = resolvedCtes.map((c) => `${quoteIdent(c.name)} AS (\n${c.sql}\n)`).join(",\n")
 		sql = `WITH ${cteDefs}\n${sql}`
 	}
 
@@ -1067,7 +1082,7 @@ function compileUnionInner<Output extends Record<string, any>, Params extends Re
 		state.outerOrderBySpecs.length > 0 || state.outerLimitValue != null || state.outerOffsetValue != null
 
 	if (hasOuter) {
-		sql = `SELECT * FROM (\n${sql}\n)`
+		sql = `SELECT * FROM (\n${sql}\n)${currentDialect().clauses.derivedTableAlias ? ` AS ${quoteIdent("__union")}` : ""}`
 		if (state.outerOrderBySpecs.length > 0) {
 			sql += `\nORDER BY ${orderByClause(state.outerOrderBySpecs).join(", ")}`
 		}
@@ -1079,8 +1094,9 @@ function compileUnionInner<Output extends Record<string, any>, Params extends Re
 		}
 	}
 
-	if (state.formatValue) {
-		sql += `\nFORMAT ${state.formatValue}`
+	const format = formatClause(state.formatValue)
+	if (format) {
+		sql += `\nFORMAT ${format}`
 	}
 
 	let parameters: ReadonlyArray<unknown> = []

@@ -14,7 +14,7 @@
 import { Result, Schema } from "effect"
 import { QueryBuilderError } from "./errors"
 import { quoteClickHouseString } from "../sql/sql-fragment"
-import { activeLiteralSyntax } from "../sql/literal-syntax"
+import { activeSqlSyntax } from "../sql/sql-syntax"
 import type { CHType } from "./types"
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
@@ -89,7 +89,7 @@ export function sqlLiteral(value: unknown, context: string): string {
  * fails here — while building the SQL — instead of becoming part of it.
  */
 export function encodeLiteral<A>(schema: Schema.Codec<A, any>, value: unknown, context: string): string {
-	return (activeLiteralSyntax()?.literal ?? sqlLiteral)(encodeValue(schema, value, context), context)
+	return (activeSqlSyntax()?.literal ?? sqlLiteral)(encodeValue(schema, value, context), context)
 }
 
 /**

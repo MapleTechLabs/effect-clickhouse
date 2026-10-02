@@ -8,7 +8,8 @@
 
 import { DateTime, Result, Schema } from "effect"
 import type { SqlFragment } from "../sql/sql-fragment"
-import { raw, str, compile, as_ as sqlAs, lazy } from "../sql/sql-fragment"
+import { raw, str, ident, compile, as_ as sqlAs, lazy } from "../sql/sql-fragment"
+import { activeSqlSyntax } from "../sql/sql-syntax"
 import { chDateTimeLiteral, CHFloatResult, CHNumber, string as chString, type CHType, type InferTS } from "./types"
 import { encodeColumnLiteral } from "./literal"
 import { markTenantColumn, markTenantPredicate, tenantColumnOf, tenantPredicatesOf } from "./tenant"
@@ -155,13 +156,23 @@ export function toFragment(value: unknown): SqlFragment {
 	if (isExprLike(value)) return value.toFragment()
 	if (typeof value === "string") return str(value)
 	if (typeof value === "number") return raw(String(value))
-	if (typeof value === "boolean") return raw(value ? "1" : "0")
+	if (typeof value === "boolean") return lazy(() => untypedLiteral(value))
 	// A DateTime column compares against a DateTime value, so the literal has to
-	// be ClickHouse's tz-less form rather than whatever `String(value)` produces.
-	if (DateTime.isDateTime(value)) return str(chDateTimeLiteral(DateTime.toUtc(value)))
-	if (value instanceof Date) return str(chDateTimeLiteral(DateTime.makeUnsafe(value)))
+	// be the dialect's own form (ClickHouse's is tz-less) rather than whatever
+	// `String(value)` produces.
+	if (DateTime.isDateTime(value)) return lazy(() => dateTimeLiteral(DateTime.toUtc(value)))
+	if (value instanceof Date) return lazy(() => dateTimeLiteral(DateTime.makeUnsafe(value)))
 	return raw(String(value))
 }
+
+/** A value with no column type to encode it, in the active dialect's syntax.
+ *  ClickHouse writes booleans as `1`/`0`, which is also the rendering outside
+ *  a compile. */
+const untypedLiteral = (value: boolean): string =>
+	activeSqlSyntax()?.literal(value, "an untyped boolean") ?? (value ? "1" : "0")
+
+const dateTimeLiteral = (value: DateTime.Utc): string =>
+	activeSqlSyntax()?.dateTimeLiteral(value) ?? compile(str(chDateTimeLiteral(value)))
 
 // Expr implementation
 
@@ -312,7 +323,10 @@ export function makeColumnRef<Name extends string, ColType extends CHType<string
 	/** The column's declared type, whose schema decodes its wire value. */
 	columnType?: ColType,
 ): ColumnRef<Name, ColType> {
-	const fragment = raw(name)
+	// `alias.Column` when qualified: the qualifier is quoted segment by segment,
+	// the column as one identifier (a ClickHouse `Nested` column has a dot).
+	const qualified = columnName !== undefined && name.endsWith(`.${columnName}`)
+	const fragment = qualified ? ident(columnName, name.slice(0, -columnName.length - 1)) : ident(name)
 	const base = makeExpr<InferTS<ColType>>(
 		fragment,
 		columnType?.schema as Schema.Codec<InferTS<ColType>, any> | undefined,
@@ -366,7 +380,7 @@ export function makeColumnRef<Name extends string, ColType extends CHType<string
 		{
 			columnName: name as Name,
 			get(key: string): Expr<any> {
-				return makeExpr<any>(lazy(() => `${name}[${compile(str(key))}]`), columnType?.element?.schema)
+				return makeExpr<any>(lazy(() => `${compile(fragment)}[${compile(str(key))}]`), columnType?.element?.schema)
 			},
 		},
 	) as ColumnRef<Name, ColType>
