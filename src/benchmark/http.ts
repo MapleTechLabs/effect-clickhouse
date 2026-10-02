@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto"
 import { Clock, Config, Effect, Redacted, Schema } from "effect"
-import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http"
+import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http"
 import { escapeClickHouseString } from "../sql/index"
 import { BenchmarkError, metricNumber, type RunOutput } from "./model"
 import type { BenchmarkTransport, LogMetrics } from "./runner"

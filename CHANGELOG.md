@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0
+
+- Require Effect `^4.0.0`. Effect 4.0.0 moved `effect/unstable/*` to `effect/*`
+  with no compatibility exports. The benchmark entries (`./benchmark/http`,
+  `./benchmark/cli`, `ch-bench`) now import `effect/http`, so 0.1.x fails there on
+  stable Effect 4 and 0.2.0 fails there on the prereleases; the builder entries
+  are unaffected either way.
+
 ## 0.1.4
 
 - Restore the non-null result types of `sum`, `sumIf`, `toFloat64OrZero`, `.add()`,
