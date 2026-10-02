@@ -13,7 +13,8 @@
 
 import { Result, Schema } from "effect"
 import { QueryBuilderError } from "./errors"
-import { escapeClickHouseString } from "../sql/sql-fragment"
+import { quoteClickHouseString } from "../sql/sql-fragment"
+import { activeLiteralSyntax } from "../sql/literal-syntax"
 import type { CHType } from "./types"
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
@@ -48,7 +49,7 @@ const oneLine = (failure: unknown): string =>
  */
 export function sqlLiteral(value: unknown, context: string): string {
 	if (value === null) return "NULL"
-	if (typeof value === "string") return `'${escapeClickHouseString(value)}'`
+	if (typeof value === "string") return quoteClickHouseString(value)
 	if (typeof value === "bigint") return String(value)
 	if (typeof value === "boolean") return value ? "1" : "0"
 
@@ -88,7 +89,7 @@ export function sqlLiteral(value: unknown, context: string): string {
  * fails here — while building the SQL — instead of becoming part of it.
  */
 export function encodeLiteral<A>(schema: Schema.Codec<A, any>, value: unknown, context: string): string {
-	return sqlLiteral(encodeValue(schema, value, context), context)
+	return (activeLiteralSyntax()?.literal ?? sqlLiteral)(encodeValue(schema, value, context), context)
 }
 
 /**

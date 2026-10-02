@@ -1,6 +1,6 @@
 # Dialects: one builder, several databases
 
-Status: step 1 landed (params go through a `Dialect`). Steps 2 to 5 are open.
+Status: steps 1 and 2 landed (params and literals go through a `Dialect`). Steps 3 to 6 are open.
 
 ## Goal
 
@@ -40,17 +40,24 @@ What we deliberately do not copy:
    of the statement, so a binding dialect can number them across unions and subqueries.
    `CompiledQuery.parameters` holds the bound values. Tenant bounds still render as ClickHouse
    literals, since they are compared as text and never sent.
-2. **Escaping behind the dialect.** `Str` and `Ident` render through
-   `dialect.escapeString` / `dialect.quoteIdent`. The `__PARAM_` placeholder safety currently
-   depends on ClickHouse escaping (`\x5F`); a dialect must state how it keeps a user value from
-   spelling a placeholder (Postgres: `E'...'` strings, or bind every literal).
-3. **Split `CHType`.** A logical type (`sql` name, TS type) plus a codec for the transport. The
+2. **Literals behind the dialect (done).** `Dialect.quoteString` and `Dialect.literal` write
+   every `Str` fragment, column literal, and inline param. `compile` installs the dialect for
+   the length of the compile (`withDialect`, the same save/restore pattern as
+   `withSubqueryCompiler`), because literals are written inside the query callbacks, which
+   have no dialect argument. The `__PARAM_` safety is now enforced rather than assumed: a
+   literal that contains the marker fails with `InvalidLiteral`, so a dialect with weaker
+   escaping cannot turn a value into a placeholder.
+3. **Identifier quoting.** Postgres folds unquoted names to lower case, so `OrgId` must be
+   written `"OrgId"`. Column refs, aliases, qualified names, `groupBy` keys and `orderBy`
+   specs are raw text today (`raw(name)` in `expr.ts`, `orderByClause` in `compile.ts`), so
+   this is its own step: column refs become `Ident` fragments that carry their qualifier.
+4. **Split `CHType`.** A logical type (`sql` name, TS type) plus a codec for the transport. The
    UInt64-as-string rule belongs to ClickHouse's `FORMAT JSON` over HTTP, not to ClickHouse;
    the native client sends something else, and Postgres drivers send int8 as a string and
    timestamptz as a `Date`.
-4. **Move `compile.ts` into `ClickHouseDialect.buildSelect(state)`.** `compileQuery` and the
+5. **Move `compile.ts` into `ClickHouseDialect.buildSelect(state)`.** `compileQuery` and the
    terminal clauses (`FORMAT`, `SETTINGS`, `LIMIT BY`) become ClickHouse-only.
-5. **Postgres dialect.** `pg.T` column types, `$n` binding, `"ident"` quoting, a function
+6. **Postgres dialect.** `pg.T` column types, `$n` binding, `"ident"` quoting, a function
    catalog covering the common cases (`FILTER (WHERE ...)`, `date_bin`, `percentile_cont`,
    jsonb access), and capability flags for what ClickHouse allows and Postgres does not
    (select aliases in `WHERE`/`HAVING`, default values instead of `NULL` in outer joins).

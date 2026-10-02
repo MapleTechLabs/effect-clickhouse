@@ -189,14 +189,17 @@ Use `decodeRows` to validate wire values against the row schema.
 
 ## Dialects
 
-A `Dialect` decides how resolved params reach the server. The default,
-`clickhouseDialect`, writes each value into the SQL as a ClickHouse literal and leaves
+A `Dialect` decides how literals are written and how resolved params reach the server. Its
+`quoteString` and `literal` write every string fragment, every value compared against a column,
+and every inline param, for the length of the compile. The default, `clickhouseDialect`,
+writes each value into the SQL as a ClickHouse literal and leaves
 `parameters` empty. A dialect whose `params` style is `bind` leaves a placeholder instead and
 returns the encoded values in `parameters`, numbered once across the whole statement, unions
 and subqueries included:
 
 ```ts
 const numbered: CH.Dialect = {
+	...CH.clickhouseDialect,
 	name: "numbered",
 	params: { _tag: "bind", placeholder: (index) => `$${index}`, reuse: true },
 }
@@ -211,7 +214,12 @@ for positional `?` placeholders, which bind a value each time they appear. Eithe
 value is the column codec's wire form, the same value an inline literal is written from, and a
 missing or ill-typed param still fails the compile.
 
-The SQL itself is still ClickHouse SQL; a dialect only changes how params are sent today.
+Params are resolved by rewriting placeholders in the finished SQL, so a dialect's literals must
+never spell the param marker `__PARAM_`. ClickHouse writes it as `\x5F_PARAM_`; a literal that
+does contain the marker fails the compile with `InvalidLiteral` rather than being rewritten.
+
+Identifiers, clauses, and functions are still ClickHouse SQL; a dialect changes literals and
+param binding today.
 
 ## Handwritten SQL
 

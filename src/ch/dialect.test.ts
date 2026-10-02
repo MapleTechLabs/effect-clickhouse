@@ -1,17 +1,41 @@
 import { describe, expect, it } from "@effect/vitest"
+import { compile as compileFragment, str } from "../sql/sql-fragment"
 import { compileCHUnsafe, compileUnionUnsafe } from "./compile"
 import type { Dialect } from "./dialect"
 import * as CH from "./index"
 
 const numbered: Dialect = {
+	...CH.clickhouseDialect,
 	name: "numbered",
 	params: { _tag: "bind", placeholder: (index) => `$${index}`, reuse: true },
 }
 
 const positional: Dialect = {
+	...CH.clickhouseDialect,
 	name: "positional",
 	params: { _tag: "bind", placeholder: () => "?", reuse: false },
 }
+
+// Standard SQL strings: a quote is doubled, a backslash is literal text.
+const standardQuote = (value: string) => `'${value.replace(/'/g, "''")}'`
+const literalDialect = (name: string, quoteString: (value: string) => string): Dialect => ({
+	name,
+	quoteString,
+	literal: (value, context) => {
+		if (typeof value === "string") return quoteString(value)
+		if (typeof value === "boolean") return value ? "TRUE" : "FALSE"
+		return CH.clickhouseDialect.literal(value, context)
+	},
+	params: { _tag: "inline" },
+})
+
+// Splits the marker across two concatenated literals so no value spells it.
+const standard = literalDialect("standard", (value) =>
+	standardQuote(value).replace(/__PARAM_/g, "_' || '_PARAM_"),
+)
+
+// Quotes correctly but never escapes the param marker.
+const naive = literalDialect("naive", standardQuote)
 
 const events = CH.table(
 	"events",
@@ -100,6 +124,61 @@ describe("dialect params", () => {
 		)
 		expect(() => compileCHUnsafe(byService, { orgId: 1, service: "api" }, { dialect: numbered })).toThrow(
 			/param 'orgId'/,
+		)
+	})
+})
+
+describe("dialect literal syntax", () => {
+	it("writes column literals, string fragments and inline params in the dialect's syntax", () => {
+		const query = CH.from(events)
+			.select(($) => ({ count: $.Count }))
+			.where(($) => [
+				$.OrgId.eq(CH.param.string("orgId")),
+				$.Service.eq("O'Reilly\\"),
+				$.Service.like("%it's%"),
+			])
+		const compiled = compileCHUnsafe(query, { orgId: "a'b" }, { dialect: standard })
+		expect(compiled.sql).toContain("OrgId = 'a''b'")
+		expect(compiled.sql).toContain("Service = 'O''Reilly\\'")
+		expect(compiled.sql).toContain("Service LIKE '%it''s%'")
+
+		// The same query for ClickHouse keeps its backslash escapes.
+		const clickhouse = compileCHUnsafe(query, { orgId: "a'b" })
+		expect(clickhouse.sql).toContain("OrgId = 'a\\'b'")
+		expect(clickhouse.sql).toContain("Service = 'O\\'Reilly\\\\'")
+	})
+
+	it("reaches union branches and subqueries", () => {
+		const branch = CH.from(events)
+			.select(($) => ({ count: $.Count }))
+			.where(($) => [$.OrgId.eq("it's")])
+		const union = compileUnionUnsafe(CH.unionAll(branch, branch), {}, { dialect: standard })
+		expect(union.sql.match(/'it''s'/g)).toHaveLength(2)
+
+		const outer = compileCHUnsafe(
+			CH.fromQuery(branch, "i").select(($) => ({ total: CH.sum($.count) })),
+			{},
+			{ dialect: standard },
+		)
+		expect(outer.sql).toContain("OrgId = 'it''s'")
+	})
+
+	it("is only installed for the compile", () => {
+		compileCHUnsafe(byService, { orgId: "o", service: "s" }, { dialect: standard })
+		expect(compileFragment(str("it's"))).toBe("'it\\'s'")
+	})
+
+	// Params are resolved by rewriting the finished SQL, so a literal that spells
+	// a placeholder would be rewritten too. A dialect that fails to escape the
+	// marker is refused instead of trusted.
+	it("refuses a literal that spells the param marker", () => {
+		const smuggle = CH.from(events)
+			.select(($) => ({ count: $.Count }))
+			.where(($) => [$.OrgId.eq(CH.param.string("orgId")), $.Service.eq("__PARAM_string_orgId__")])
+
+		expect(() => compileCHUnsafe(smuggle, { orgId: "o" }, { dialect: naive })).toThrow(/reserved param marker/)
+		expect(compileCHUnsafe(smuggle, { orgId: "o" }, { dialect: standard }).sql).toContain(
+			"Service = '_' || '_PARAM_string_orgId__'",
 		)
 	})
 })

@@ -12,13 +12,13 @@ import type { CHQuery, CHQueryState } from "./query"
 import type { CHUnionQuery } from "./union"
 import { createQualifiedColumnAccessor, createJoinedColumnAccessor, sourceAlias } from "./query"
 import { aliased, columnTypeOf } from "./expr"
-import { raw, ident, escapeClickHouseString, compile as compileSqlFragment } from "../sql/sql-fragment"
+import { raw, ident, compile as compileSqlFragment } from "../sql/sql-fragment"
 import { splitTerminalClauses } from "../sql/terminal-clauses"
 import { compileQuery, type SqlQuery } from "../sql/sql-query"
 import { PARAM_MARKER_PREFIX, PARAM_PLACEHOLDER_PATTERN, paramSchema, type ParamKind } from "./param"
 import { mergeResultSchemas } from "./define-fn"
 import { encodeValue } from "./literal"
-import { clickhouseDialect, type Dialect } from "./dialect"
+import { checkedLiteral, clickhouseDialect, currentDialect, withDialect, type Dialect } from "./dialect"
 import { Effect, Option, Schema } from "effect"
 import { QueryBuilderDefect, QueryBuilderError } from "./errors"
 import { withSubqueryCompiler } from "./subquery-context"
@@ -513,7 +513,7 @@ export function compileCHUnsafe<
 		dialect?: Dialect
 	},
 ): CompiledQuery<Decoded, Route> {
-	return compileInner(query, params, options)
+	return withDialect(options?.dialect ?? currentDialect(), () => compileInner(query, params, options))
 }
 
 /**
@@ -545,7 +545,6 @@ function compileInner<
 		 *  For fragments spliced into a larger query — a subquery condition — whose
 		 *  params are resolved by the outer compilation pass. */
 		deferParams?: boolean
-		dialect?: Dialect
 		/**
 		 * Set by a compile that splices this query's SQL into its own: the
 		 * outer one resolves params once over the whole statement, which a
@@ -759,7 +758,7 @@ function compileInner<
 	// dialect that binds numbers its placeholders across the whole statement.
 	let parameters: ReadonlyArray<unknown> = []
 	if (!deferParams && options?.nested !== true) {
-		const rendered = renderParams(sql, params, options?.dialect ?? clickhouseDialect)
+		const rendered = renderParams(sql, params, currentDialect())
 		sql = rendered.sql
 		parameters = rendered.parameters
 	}
@@ -1012,7 +1011,7 @@ export function compileUnionUnsafe<Output extends Record<string, any>, Params ex
 		dialect?: Dialect
 	},
 ): CompiledQuery<Output, undefined> {
-	return compileUnionInner(union, params, options)
+	return withDialect(options?.dialect ?? currentDialect(), () => compileUnionInner(union, params, options))
 }
 
 /** The recursion behind {@link compileUnionUnsafe}; see {@link compileInner}. */
@@ -1022,7 +1021,6 @@ function compileUnionInner<Output extends Record<string, any>, Params extends Re
 	options?: {
 		rowSchema?: CompiledQueryRowSchema<Output>
 		deferParams?: boolean
-		dialect?: Dialect
 		/** Set by a compile that splices this union's SQL into its own, and so
 		 *  resolves its params itself. */
 		nested?: boolean
@@ -1087,7 +1085,7 @@ function compileUnionInner<Output extends Record<string, any>, Params extends Re
 
 	let parameters: ReadonlyArray<unknown> = []
 	if (!deferParams && options?.nested !== true) {
-		const rendered = renderParams(sql, params, options?.dialect ?? clickhouseDialect)
+		const rendered = renderParams(sql, params, currentDialect())
 		sql = rendered.sql
 		parameters = rendered.parameters
 	}
@@ -1153,7 +1151,7 @@ function renderParams(
 			return placeholder
 		}
 		const value = encodeParam(kind as ParamKind, name, params[name])
-		if (style._tag === "inline") return style.literal(value, paramContext(kind, name))
+		if (style._tag === "inline") return checkedLiteral(dialect, value, paramContext(kind, name))
 
 		const key = `${kind}\0${name}`
 		const existing = style.reuse ? bound.get(key) : undefined

@@ -1,4 +1,5 @@
 import { Data } from "effect"
+import { activeLiteralSyntax } from "./literal-syntax"
 
 // ClickHouse string escaping
 
@@ -27,12 +28,19 @@ export function escapeClickHouseString(value: string): string {
 		.replace(/__PARAM_/g, "\\x5F_PARAM_")
 }
 
+/** A string as a ClickHouse literal: quoted, and escaped as above. */
+export const quoteClickHouseString = (value: string): string => `'${escapeClickHouseString(value)}'`
+
+/** A string literal in the syntax of the dialect being compiled for, or
+ *  ClickHouse's outside a compile. */
+const quoteString = (value: string): string => (activeLiteralSyntax()?.quoteString ?? quoteClickHouseString)(value)
+
 // SQL Fragment AST
 
 export type SqlFragment = Data.TaggedEnum<{
 	/** Raw SQL string — no escaping. For ClickHouse-specific syntax. */
 	Raw: { readonly sql: string }
-	/** Auto-escaped string parameter: produces 'escaped_value' */
+	/** A string literal, quoted and escaped by the dialect being compiled for */
 	Str: { readonly value: string }
 	/** Integer parameter: produces the number as string, rounded */
 	Int: { readonly value: number }
@@ -76,7 +84,7 @@ export const lazy = (render: () => string): SqlFragment => Frag.Lazy({ render })
 
 export const compile: (fragment: SqlFragment) => string = Frag.$match({
 	Raw: ({ sql }) => sql,
-	Str: ({ value }) => `'${escapeClickHouseString(value)}'`,
+	Str: ({ value }) => quoteString(value),
 	Int: ({ value }) => String(Math.round(value)),
 	Ident: ({ name }) => name,
 	Join: ({ separator, fragments }) => fragments.map(compile).filter(Boolean).join(separator),
