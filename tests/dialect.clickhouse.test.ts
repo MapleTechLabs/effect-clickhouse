@@ -1,5 +1,5 @@
 import { Effect } from "effect"
-import { FetchHttpClient } from "effect/unstable/http"
+import { FetchHttpClient } from "effect/http"
 import { describe, expect, it } from "@effect/vitest"
 import { dialectCases, typeCases } from "./dialect-cases"
 import { endpoint, execute } from "./clickhouse-support"

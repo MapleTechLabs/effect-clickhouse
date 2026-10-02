@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { Effect, Schema } from "effect"
-import { HttpClient, HttpClientRequest } from "effect/unstable/http"
+import { HttpClient, HttpClientRequest } from "effect/http"
 import type * as CH from "@maple-dev/effect-clickhouse"
 
 // Opt in with EFFECT_CLICKHOUSE_TEST_URL, plus _USER and _PASSWORD if needed.

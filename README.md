@@ -27,14 +27,14 @@ Built on [Effect](https://effect.website) (peer dependency).
 Install the package with its Effect 4 peer:
 
 ```bash
-bun add @maple-dev/effect-clickhouse "effect@>=4.0.0-rc.113 <5"
+bun add @maple-dev/effect-clickhouse "effect@^4.0.0"
 ```
 
 See [Getting started](./docs/getting-started.md) for source builds and examples.
 
-`effect` is a peer dependency. The recommended range `>=4.0.0-rc.113 <5` allows
-newer Effect 4 releases without opting into Effect 5. Effect 3 is incompatible.
-Keep the version range quoted so your shell does not interpret `<` or `>`.
+`effect` is a peer dependency. The recommended range `^4.0.0` allows
+newer Effect 4 releases without opting into Effect 5. Effect 3 and the Effect 4
+prereleases are incompatible.
 
 ## Quick start
 
