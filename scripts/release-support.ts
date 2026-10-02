@@ -1,5 +1,5 @@
 import { Effect, Schema, Stream } from "effect"
-import { ChildProcess } from "effect/unstable/process"
+import { ChildProcess } from "effect/process"
 
 export class ReleaseCheckError extends Schema.TaggedError<ReleaseCheckError>()(
 	"@maple-dev/effect-clickhouse/ReleaseCheckError",

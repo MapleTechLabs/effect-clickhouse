@@ -1,6 +1,6 @@
 {
 	"name": "@maple-dev/effect-clickhouse",
-	"version": "0.1.4",
+	"version": "0.2.0",
 	"description": "Type-safe ClickHouse queries, result decoding, and reproducible benchmarks for Effect and TypeScript",
 	"keywords": [
 		"clickhouse",
@@ -73,22 +73,22 @@
 	},
 	"devDependencies": {
 		"@clickhouse/client": "1.21.0",
-		"@effect/language-service": "^0.87.2",
-		"@effect/platform-bun": "4.0.0-rc.117",
-		"@effect/sql-clickhouse": "4.0.0-rc.117",
-		"@effect/vitest": "4.0.0-rc.117",
+		"@effect/language-service": "^0.87.3",
+		"@effect/platform-bun": "4.0.0",
+		"@effect/sql-clickhouse": "4.0.0",
+		"@effect/vitest": "4.0.0",
 		"@types/node": "^22.10.2",
-		"effect": "4.0.0-rc.117",
+		"effect": "4.0.0",
 		"expect-type": "^1.3.0",
 		"tsdown": "^0.22.14",
 		"typescript": "^7.0.2",
 		"vitest": "^4.1.9"
 	},
 	"peerDependencies": {
-		"effect": ">=4.0.0-rc.113 <5"
+		"effect": "^4.0.0"
 	},
 	"packageManager": "bun@1.4.0",
 	"patchedDependencies": {
-		"@effect/vitest@4.0.0-rc.117": "patches/@effect%2Fvitest@4.0.0-rc.117.patch"
+		"@effect/vitest@4.0.0": "patches/@effect%2Fvitest@4.0.0.patch"
 	}
 }

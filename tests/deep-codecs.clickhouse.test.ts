@@ -1,5 +1,5 @@
 import { DateTime, Effect, Schema } from "effect"
-import { FetchHttpClient } from "effect/unstable/http"
+import { FetchHttpClient } from "effect/http"
 import { describe, expect, it } from "@effect/vitest"
 import * as CH from "@maple-dev/effect-clickhouse"
 import * as T from "@maple-dev/effect-clickhouse/types"
