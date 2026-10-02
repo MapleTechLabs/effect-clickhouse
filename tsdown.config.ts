@@ -6,6 +6,7 @@ export default defineConfig({
 		expr: "./src/expr.ts",
 		types: "./src/types.ts",
 		sql: "./src/sql/index.ts",
+		postgres: "./src/postgres.ts",
 		"benchmark/index": "./src/benchmark/index.ts",
 		"benchmark/http": "./src/benchmark/http.ts",
 		"benchmark/cli": "./src/benchmark/cli.ts",

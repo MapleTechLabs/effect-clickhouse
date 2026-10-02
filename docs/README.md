@@ -52,6 +52,7 @@ Roughly in reading order.
 | [Agent benchmark playbook](./benchmark-agent.md)      | Repeatable optimization workflow and evidence checklist                             |
 | [Tenant scoping](./tenant-scoping.md)                 | `tenantScope`, what marks a query scoped, `crossTenant()`                           |
 | [Extending the DSL](./extending.md)                   | `defineFn`, raw escape hatches, handwritten SQL                                     |
+| [Postgres](./postgres.md)                             | The Postgres dialect, its column types and functions                                |
 
 ## Reference
 

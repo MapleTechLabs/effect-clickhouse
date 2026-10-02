@@ -151,6 +151,7 @@ Full guides live in [`docs/`](./docs/README.md):
 | [Decoding results](./docs/decoding-results.md)             | `rowSchema`, `decodeRows`, decode errors                        |
 | [Running a query](./docs/running-queries.md)               | Executing the SQL with a real client, wire settings, `SETTINGS` |
 | [Tenant scoping](./docs/tenant-scoping.md)                 | `tenantColumn`, what marks a query scoped, `crossTenant()`      |
+| [Postgres](./docs/postgres.md)                             | The Postgres dialect, its column types and functions            |
 | [Extending the DSL](./docs/extending.md)                   | `defineFn`, raw escape hatches, handwritten SQL                 |
 | [API reference](./docs/reference.md)                       | Full export catalog by module, plus error types                 |
 
@@ -166,6 +167,7 @@ regressions live in [`src/docs-examples.test.ts`](./src/docs-examples.test.ts).
 | `@maple-dev/effect-clickhouse/types` | Column-type constructors (`string`, `uint64`, `dateTime`, `map`, `array`, `nullable`, …) and the `CH*` type descriptors.                                                                        |
 | `@maple-dev/effect-clickhouse/expr`  | Kitchen-sink namespace: every expression helper plus all ClickHouse functions under their raw names (`min_`, `toString_`, `toStartOfInterval`, `dynamicColumn`, …). Handy for `import * as CH`. |
 | `@maple-dev/effect-clickhouse/sql`   | The low-level `SqlFragment` AST (`raw`, `ident`, `compile`, …) for hand-rolling fragments.                                                                                                      |
+| `@maple-dev/effect-clickhouse/postgres` | The Postgres dialect: `postgresDialect`, Postgres column types and functions, and a `compile` that defaults to Postgres.                                                                     |
 
 ## Extending with custom functions
 

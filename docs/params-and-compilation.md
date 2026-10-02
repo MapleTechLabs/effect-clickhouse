@@ -189,13 +189,16 @@ Use `decodeRows` to validate wire values against the row schema.
 
 ## Dialects
 
-A `Dialect` decides how literals are written and how resolved params reach the server. Its
-`quoteString` and `literal` write every string fragment, every value compared against a column,
-and every inline param, for the length of the compile. The default, `clickhouseDialect`,
-writes each value into the SQL as a ClickHouse literal and leaves
-`parameters` empty. A dialect whose `params` style is `bind` leaves a placeholder instead and
-returns the encoded values in `parameters`, numbered once across the whole statement, unions
-and subqueries included:
+A `Dialect` is the database a query is compiled for: how identifiers and literals are written,
+how resolved params reach the server, and which clauses exist. It is installed for the length of
+the compile, so every column reference, string fragment, compared value and inline param goes
+through it. The default, `clickhouseDialect`, writes names bare and each param value into the SQL
+as a ClickHouse literal, and leaves `parameters` empty. `postgresDialect`, from the `/postgres`
+entry point, is the other built-in one; see [Postgres](./postgres.md).
+
+A dialect whose `params` style is `bind` leaves a placeholder instead and returns the encoded
+values in `parameters`, numbered once across the whole statement, unions and subqueries
+included:
 
 ```ts
 const numbered: CH.Dialect = {
@@ -212,14 +215,24 @@ const compiled = CH.compileUnsafe(query, { orgId: "org_1" }, { dialect: numbered
 `reuse: true` lets one numbered placeholder stand for every use of a param; set it to `false`
 for positional `?` placeholders, which bind a value each time they appear. Either way a bound
 value is the column codec's wire form, the same value an inline literal is written from, and a
-missing or ill-typed param still fails the compile.
+missing or ill-typed param still fails the compile. `paramCodecs` re-encodes a portable param
+kind where the database wants another form: Postgres binds `param.bool` as a boolean rather
+than `1`/`0`.
+
+| Member | Purpose |
+| --- | --- |
+| `quoteIdent` | One identifier: a column, alias, table or schema name |
+| `quoteString`, `literal` | A string, or any encoded wire value, as a literal |
+| `dateTimeLiteral` | A point in time compared against an expression with no declared type |
+| `params` | `inline`, or `bind` with a placeholder function |
+| `clauses.format` | Whether `FORMAT` exists; `.format()` fails to compile where it does not |
+| `clauses.derivedTableAlias` | Whether a subquery in FROM needs an alias |
+| `clauses.groupByAlias` | Whether GROUP BY resolves select aliases; if not, keys are written by position |
+| `paramCodecs` | Per-kind codec overrides for `param.*` |
 
 Params are resolved by rewriting placeholders in the finished SQL, so a dialect's literals must
 never spell the param marker `__PARAM_`. ClickHouse writes it as `\x5F_PARAM_`; a literal that
 does contain the marker fails the compile with `InvalidLiteral` rather than being rewritten.
-
-Identifiers, clauses, and functions are still ClickHouse SQL; a dialect changes literals and
-param binding today.
 
 ## Handwritten SQL
 

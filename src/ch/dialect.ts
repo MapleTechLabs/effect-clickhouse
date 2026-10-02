@@ -46,6 +46,9 @@ export interface DialectClauses {
 	readonly format: boolean
 	/** Whether a subquery in FROM needs an alias (`SELECT * FROM (…) AS u`). */
 	readonly derivedTableAlias: boolean
+	/** Whether GROUP BY resolves a select alias before an input column of the
+	 *  same name. Where it does not, keys are written by select-list position. */
+	readonly groupByAlias: boolean
 }
 
 /**
@@ -78,7 +81,7 @@ export const clickhouseDialect: Dialect = {
 	literal: sqlLiteral,
 	dateTimeLiteral: (value) => quoteClickHouseString(chDateTimeLiteral(value)),
 	params: { _tag: "inline" },
-	clauses: { format: true, derivedTableAlias: false },
+	clauses: { format: true, derivedTableAlias: false, groupByAlias: true },
 }
 
 // The dialect of the enclosing compile, beside the syntax installed for the

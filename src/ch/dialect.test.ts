@@ -189,7 +189,7 @@ describe("dialect identifiers and clauses", () => {
 		...CH.clickhouseDialect,
 		name: "quoted",
 		quoteIdent: (name) => `"${name.replace(/"/g, '""')}"`,
-		clauses: { format: false, derivedTableAlias: true },
+		clauses: { format: false, derivedTableAlias: true, groupByAlias: true },
 	}
 	const services = CH.table("db.services", { OrgId: CH.string, Service: CH.string }, { tenantColumn: "OrgId" })
 

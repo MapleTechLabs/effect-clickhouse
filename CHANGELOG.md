@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- Add `Dialect`: how a compiled query writes identifiers and literals, binds params, and
+  which clauses exist. `compile` and friends take `options.dialect`; `clickhouseDialect` is the
+  default and its output is unchanged.
+- Add `CompiledQuery.parameters`: the values a binding dialect sends beside `sql`, empty for
+  ClickHouse. Code that builds a `CompiledQuery` by hand must now supply it.
+- Add the `./postgres` entry point: `postgresDialect` (quoted identifiers, `$n` binding),
+  Postgres column types and functions, and a `compile` that defaults to Postgres.
+- A literal that would contain the param marker `__PARAM_` now fails the compile with
+  `InvalidLiteral` instead of relying on each dialect's escaping.
+- `compileUnionUnsafe` no longer accepts the internal `enclosingCtes` option.
+
 ## 0.2.0
 
 - Require Effect `^4.0.0`. Effect 4.0.0 moved `effect/unstable/*` to `effect/*`

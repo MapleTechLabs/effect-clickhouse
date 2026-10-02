@@ -68,6 +68,17 @@ const orderByClause = (specs: ReadonlyArray<[string, "asc" | "desc"]>): Array<st
 		return `${quoteIdent(column)} ${direction.toUpperCase()}`
 	})
 
+/**
+ * A `groupBy` key: the select alias where the dialect resolves aliases there,
+ * otherwise the selected column's position. Postgres reads a bare name in
+ * GROUP BY as an input column first, so `select({ Service: lower(…) })` grouped
+ * by `"Service"` would group by the raw column; `GROUP BY 1` cannot be misread.
+ */
+const groupByKey = (key: string, selected: ReadonlyArray<string>): string => {
+	const position = selected.indexOf(key)
+	return currentDialect().clauses.groupByAlias || position === -1 ? quoteIdent(key) : String(position + 1)
+}
+
 /** `.format()`'s value, refused for a dialect that has no `FORMAT` clause:
  *  dropping it would hand the caller rows in a shape they did not ask for. A
  *  defect, because the format is written in the query definition. */
@@ -747,7 +758,7 @@ function compileInner<
 			from: fromFragment,
 			joins,
 			where: whereFragments,
-			groupBy: state.groupByKeys.map((k) => raw(quoteIdent(k))),
+			groupBy: state.groupByKeys.map((k) => raw(groupByKey(k, options?.selectKeys ?? keys))),
 			// Deliberately excluded from tenant evidence: by HAVING time the
 			// rows are already aggregated, so the scan that produced them crossed
 			// tenants no matter what this filters out.
@@ -1166,7 +1177,7 @@ function renderParams(
 			missing.push(name)
 			return placeholder
 		}
-		const value = encodeParam(kind as ParamKind, name, params[name])
+		const value = encodeParam(dialect, kind as ParamKind, name, params[name])
 		if (style._tag === "inline") return checkedLiteral(dialect, value, paramContext(kind, name))
 
 		const key = `${kind}\0${name}`
@@ -1219,8 +1230,8 @@ const paramContext = (kind: string, name: string): string => `param '${name}' ($
  * the two directions cannot drift: a `DateTime` param and a `DateTime` column
  * agree on the literal by construction, not by two functions being kept in sync.
  */
-function encodeParam(kind: ParamKind, name: string, value: unknown): unknown {
-	const schema = paramSchema(kind)
+function encodeParam(dialect: Dialect, kind: ParamKind, name: string, value: unknown): unknown {
+	const schema = dialect.paramCodecs?.[kind] ?? paramSchema(kind)
 	if (schema === undefined) {
 		// Only reachable from a hand-written placeholder naming a kind nothing
 		// declared: `param.of` registers its type before it can reach any SQL —

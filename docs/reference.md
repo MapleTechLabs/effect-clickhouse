@@ -36,6 +36,7 @@ The root barrel is curated. These are exported by the package but not from it:
 | `Suite`, `RunOutput`, `BenchmarkError` and benchmark contracts                                   | `/benchmark`      |
 | `makeHttpClient`, `makeHttpTransport`, `httpConfigFromEnv`                                       | `/benchmark/http` |
 | `runCli`                                                                                         | `/benchmark/cli`  |
+| `postgresDialect`, Postgres column types and functions, Postgres-default `compile`              | `/postgres`       |
 
 Every column-type constructor and every expression helper is on the root as well as on its
 subpath. See [Running a query](./running-queries.md) for what the `/sql` statement helpers are
@@ -90,8 +91,10 @@ Note `/sql` exports a `compile` (fragment → string) distinct from the root `co
 | `rawCompiledQuery`   | `({ sql, tenantScope, reason, justification, rowSchema?, route? }) => CompiledQuery` |
 | `clickhouseDialect`  | The default `Dialect`: params written into the SQL as ClickHouse literals            |
 
-`Dialect` and `ParamStyle` describe how params reach the server; pass one as
-`options.dialect`. See [Params and compilation](./params-and-compilation.md#dialects).
+`Dialect`, `DialectClauses` and `ParamStyle` describe a database: how identifiers and literals
+are written, how params reach the server, and which clauses exist. Pass one as
+`options.dialect`. See [Params and compilation](./params-and-compilation.md#dialects) and
+[Postgres](./postgres.md).
 
 ### Params
 
@@ -273,7 +276,7 @@ Types: `WindowSpec`, `CompiledWindowSpec`, `WindowFrameBound`, `WindowRowsFrame`
 **Everything else** — `Table`, `TableOptions`, `Expr`, `ColumnRef`, `Condition`, `Comparable`
 (what a value of a type may be compared against), `MapValueOf`, `Subquery`, `ParamMarker`,
 `ParamKind`, `CHQuery`, `CHUnionQuery`, `ColumnAccessor`, `JoinedColumnAccessor`,
-`JoinOnCallback`, `CompiledQuery`, `CompiledQueryInput`, `CompiledQueryRowSchema`, `RowSchemaMismatch`, `TenantScope`, `Dialect`, `ParamStyle`, `FnResult`,
+`JoinOnCallback`, `CompiledQuery`, `CompiledQueryInput`, `CompiledQueryRowSchema`, `RowSchemaMismatch`, `TenantScope`, `Dialect`, `DialectClauses`, `ParamStyle`, `FnResult`,
 `WindowFunnelMode`, `WindowSpec`, `WindowRowsFrame`, `WindowFrameBound`,
 `WindowOrderDirection`, `CompiledWindowSpec`.
 
