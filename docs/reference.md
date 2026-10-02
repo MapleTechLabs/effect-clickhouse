@@ -88,6 +88,10 @@ Note `/sql` exports a `compile` (fragment → string) distinct from the root `co
 | `compileUnion`       | `(union, params, options?) => Effect<CompiledQuery<Output>, QueryBuilderError>`      |
 | `compileUnionUnsafe` | The same, throwing instead                                                           |
 | `rawCompiledQuery`   | `({ sql, tenantScope, reason, justification, rowSchema?, route? }) => CompiledQuery` |
+| `clickhouseDialect`  | The default `Dialect`: params written into the SQL as ClickHouse literals            |
+
+`Dialect` and `ParamStyle` describe how params reach the server; pass one as
+`options.dialect`. See [Params and compilation](./params-and-compilation.md#dialects).
 
 ### Params
 
@@ -269,7 +273,7 @@ Types: `WindowSpec`, `CompiledWindowSpec`, `WindowFrameBound`, `WindowRowsFrame`
 **Everything else** — `Table`, `TableOptions`, `Expr`, `ColumnRef`, `Condition`, `Comparable`
 (what a value of a type may be compared against), `MapValueOf`, `Subquery`, `ParamMarker`,
 `ParamKind`, `CHQuery`, `CHUnionQuery`, `ColumnAccessor`, `JoinedColumnAccessor`,
-`JoinOnCallback`, `CompiledQuery`, `CompiledQueryInput`, `CompiledQueryRowSchema`, `RowSchemaMismatch`, `TenantScope`, `FnResult`,
+`JoinOnCallback`, `CompiledQuery`, `CompiledQueryInput`, `CompiledQueryRowSchema`, `RowSchemaMismatch`, `TenantScope`, `Dialect`, `ParamStyle`, `FnResult`,
 `WindowFunnelMode`, `WindowSpec`, `WindowRowsFrame`, `WindowFrameBound`,
 `WindowOrderDirection`, `CompiledWindowSpec`.
 

@@ -147,6 +147,7 @@ CH.compileUnsafe(query, params, options?)  // CompiledQuery, throws
 | `options.rowSchema`   | Effect `Schema` used by `decodeRows` / `decodeFirstRow`              |
 | `options.skipFormat`  | Omit a trailing `FORMAT` clause (used internally for subqueries)     |
 | `options.deferParams` | Leave placeholders unresolved, for SQL spliced into an outer compile |
+| `options.dialect`     | How params reach the server; `clickhouseDialect` when omitted        |
 
 `compileCH` is the internal name; the package exports it as `compile`. Unions use
 `compileUnion(union, params)`.
@@ -156,6 +157,7 @@ CH.compileUnsafe(query, params, options?)  // CompiledQuery, throws
 ```ts
 interface CompiledQuery<Output> {
 	readonly sql: string
+	readonly parameters: ReadonlyArray<unknown>
 	readonly tenantScope: "single-tenant" | "cross-tenant" | "untenanted"
 	readonly rowSchemaSource: "declared" | "derived" | "none"
 	readonly rowSchema: CompiledQueryRowSchema<Output> | undefined
@@ -172,6 +174,7 @@ interface CompiledQuery<Output> {
 | Field                           | Purpose                                                                                  |
 | ------------------------------- | ---------------------------------------------------------------------------------------- |
 | `sql`                           | The statement to execute. The builder never runs it.                                     |
+| `parameters`                    | Values a binding dialect sends beside `sql`, in placeholder order; empty by default      |
 | `tenantScope`                   | Whether the query pins a single tenant — see [Tenant scoping](./tenant-scoping.md)       |
 | `rowSchemaSource`               | Where the row schema came from, so a caller can tell real validation from a pass-through |
 | `rowSchema`                     | The codec itself, for a caller that needs a `Schema` rather than a call                  |
@@ -183,6 +186,32 @@ interface CompiledQuery<Output> {
 | `encodeRows`                    | The same codec backwards — decoded rows to the wire shape                                |
 
 Use `decodeRows` to validate wire values against the row schema.
+
+## Dialects
+
+A `Dialect` decides how resolved params reach the server. The default,
+`clickhouseDialect`, writes each value into the SQL as a ClickHouse literal and leaves
+`parameters` empty. A dialect whose `params` style is `bind` leaves a placeholder instead and
+returns the encoded values in `parameters`, numbered once across the whole statement, unions
+and subqueries included:
+
+```ts
+const numbered: CH.Dialect = {
+	name: "numbered",
+	params: { _tag: "bind", placeholder: (index) => `$${index}`, reuse: true },
+}
+
+const compiled = CH.compileUnsafe(query, { orgId: "org_1" }, { dialect: numbered })
+// compiled.sql:        ... WHERE OrgId = $1
+// compiled.parameters: ["org_1"]
+```
+
+`reuse: true` lets one numbered placeholder stand for every use of a param; set it to `false`
+for positional `?` placeholders, which bind a value each time they appear. Either way a bound
+value is the column codec's wire form, the same value an inline literal is written from, and a
+missing or ill-typed param still fails the compile.
+
+The SQL itself is still ClickHouse SQL; a dialect only changes how params are sent today.
 
 ## Handwritten SQL
 
