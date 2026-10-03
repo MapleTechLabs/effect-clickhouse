@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Postgres: wrap each `UNION ALL` branch in parentheses (`DialectClauses.parenthesizeUnionBranches`).
+  A branch with its own `WITH`, `ORDER BY` or `LIMIT` was a syntax error.
+- Postgres: bind `param.float` as `$n::float8`, `param.bool` as `$n::boolean`, and the
+  `dateTime` kinds as `$n::timestamptz`. A float compared with an int8 column was bound as
+  int8 and rejected, and a param in a select list was bound as text.
+- `ParamStyle.placeholder` receives the param kind as a second argument.
+- Docs: exact int8 needs a codec that reads a `bigint` as well as a string; PGlite and
+  postgres.js send `bigint`, so the documented `custom("int8", Schema.String)` failed there.
 - Rename the package to `@maple-dev/effect-orm` and the repository to `MapleTechLabs/effect-orm`.
   Imports, error `_tag` prefixes (`@maple-dev/effect-orm/QueryBuilderError`, ...) and the live-test
   variables (`EFFECT_ORM_CLICKHOUSE_URL`, `_USER`, `_PASSWORD`) change with it.
