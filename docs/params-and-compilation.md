@@ -228,6 +228,7 @@ than `1`/`0`.
 | `clauses.format` | Whether `FORMAT` exists; `.format()` fails to compile where it does not |
 | `clauses.derivedTableAlias` | Whether a subquery in FROM needs an alias |
 | `clauses.groupByAlias` | Whether GROUP BY resolves select aliases; if not, keys are written by position |
+| `clauses.parenthesizeUnionBranches` | Whether each `UNION ALL` branch is wrapped in parentheses |
 | `paramCodecs` | Per-kind codec overrides for `param.*` |
 
 Params are resolved by rewriting placeholders in the finished SQL, so a dialect's literals must

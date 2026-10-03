@@ -15,7 +15,8 @@ export type PgType<Tag extends string, A, I = A> = CHType<Tag, A, I>
 
 /** A number as any Postgres driver sends one: a number, a numeric string, or a
  *  `bigint`. Decodes to `number`, so an int8 beyond 2^53 loses precision; declare
- *  `custom("int8", Schema.String)` where that matters. */
+ *  `custom("int8", Schema.Union([Schema.BigInt, Schema.BigIntFromString]))`
+ *  where that matters. */
 export const PgNumber: Schema.Codec<number, number | string | bigint> = Schema.Union([
 	Schema.Finite,
 	Schema.FiniteFromString,

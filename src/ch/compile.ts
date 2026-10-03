@@ -1086,7 +1086,8 @@ function compileUnionInner<Output extends Record<string, any>, Params extends Re
 				? "untenanted"
 				: "cross-tenant"
 
-	let sql = subQueries.map((q) => q.sql).join("\nUNION ALL\n")
+	const parenthesize = currentDialect().clauses.parenthesizeUnionBranches
+	let sql = subQueries.map((q) => (parenthesize ? `(\n${q.sql}\n)` : q.sql)).join("\nUNION ALL\n")
 
 	// Wrap in outer SELECT if ordering/pagination is needed
 	const hasOuter =
@@ -1184,7 +1185,7 @@ function renderParams(
 		const existing = style.reuse ? bound.get(key) : undefined
 		if (existing !== undefined) return existing
 		parameters.push(value)
-		const marker = style.placeholder(parameters.length)
+		const marker = style.placeholder(parameters.length, kind)
 		bound.set(key, marker)
 		return marker
 	})
