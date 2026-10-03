@@ -68,7 +68,7 @@ What we deliberately do not copy:
    three places in `compile.ts`, which kept ClickHouse output byte-identical without
    relocating ~1100 lines. A dialect that needs a structurally different statement is the
    point to revisit this.
-6. **Postgres dialect (done).** `@maple-dev/effect-clickhouse/postgres`: `postgresDialect`
+6. **Postgres dialect (done).** `@maple-dev/effect-orm/postgres`: `postgresDialect`
    (double-quoted identifiers, standard strings with `E'…'` only to escape the param marker,
    `$n` binding), column types, a function catalog (`count(*)`, `FILTER (WHERE …)`,
    `percentile_cont`, `date_trunc(…, 'UTC')`, `date_bin`, `array_agg`, `->>`), and a

@@ -1,8 +1,8 @@
 import { DateTime, Effect } from "effect"
 import { FetchHttpClient } from "effect/http"
 import { describe, expect, it } from "@effect/vitest"
-import * as CH from "@maple-dev/effect-clickhouse"
-import * as T from "@maple-dev/effect-clickhouse/types"
+import * as CH from "@maple-dev/effect-orm"
+import * as T from "@maple-dev/effect-orm/types"
 
 import { endpoint, execute } from "./clickhouse-support"
 

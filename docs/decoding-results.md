@@ -152,7 +152,7 @@ Both decoders fail with `CompiledQueryDecodeError`, carrying the index of the of
 ```ts
 const error = await Effect.runPromise(Effect.flip(compiled.decodeRows([{ name: 42, count: 1 }])))
 
-error._tag // "@maple-dev/effect-clickhouse/CompiledQueryDecodeError"
+error._tag // "@maple-dev/effect-orm/CompiledQueryDecodeError"
 error.rowIndex // 0
 error.message // "Compiled query row 0 did not match its declared output schema"
 error.cause // the underlying Schema parse error

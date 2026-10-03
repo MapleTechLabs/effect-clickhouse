@@ -21,7 +21,7 @@ import { splitTerminalClauses } from "./terminal-clauses"
 // `undefined` in the parsed shape, and the codec encodes to SQL text rather than
 // to JSON, so key presence never reaches a wire format.
 export class ClickHouseStatement extends Schema.Class<ClickHouseStatement>(
-	"@maple-dev/effect-clickhouse/ClickHouseStatement",
+	"@maple-dev/effect-orm/ClickHouseStatement",
 )({
 	body: Schema.String,
 	settings: Schema.optional(Schema.String),

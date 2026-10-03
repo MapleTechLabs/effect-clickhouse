@@ -247,7 +247,7 @@ describe("spliced sub-SELECTs", () => {
 				.where(($) => [$.OrgId.eq(param.string("orgId")), $.TraceId.gte(cutoff)])
 
 			const error = yield* Effect.flip(CH.compile(outer, { orgId: "org_1" }))
-			expect(error._tag).toBe("@maple-dev/effect-clickhouse/QueryBuilderError")
+			expect(error._tag).toBe("@maple-dev/effect-orm/QueryBuilderError")
 			expect(error.code).toBe("InvalidLiteral")
 		}),
 	)

@@ -13,7 +13,7 @@ These examples assume UTC timestamps.
 
 ```ts title="time-buckets.ts"
 import { Effect } from "effect"
-import * as CH from "@maple-dev/effect-clickhouse"
+import * as CH from "@maple-dev/effect-orm"
 import { Events } from "./schema"
 
 const query = CH.from(Events)
@@ -57,7 +57,7 @@ in your product, return an empty result before executing instead.
 
 ```ts title="optional-filters.ts"
 import { Effect } from "effect"
-import * as CH from "@maple-dev/effect-clickhouse"
+import * as CH from "@maple-dev/effect-orm"
 import { Events } from "./schema"
 
 export const buildQuery = (names: readonly string[], minDurationMs?: number) =>
@@ -93,8 +93,8 @@ Use `where` to choose events, then `having` to choose groups by their aggregated
 
 ```ts title="aggregate-filter.ts"
 import { Effect } from "effect"
-import * as CH from "@maple-dev/effect-clickhouse"
-import * as T from "@maple-dev/effect-clickhouse/types"
+import * as CH from "@maple-dev/effect-orm"
+import * as T from "@maple-dev/effect-orm/types"
 import { Events } from "./schema"
 
 const query = CH.from(Events)
@@ -124,7 +124,7 @@ makes `name` unique in this result, so it breaks ties between equal counts.
 
 ```ts title="pagination.ts"
 import { Effect } from "effect"
-import * as CH from "@maple-dev/effect-clickhouse"
+import * as CH from "@maple-dev/effect-orm"
 import { Events } from "./schema"
 
 const pageSize = 25
@@ -153,8 +153,8 @@ JSON parsing could lose precision. This also works for IDs produced by numeric h
 
 ```ts title="large-ids.ts"
 import { Effect } from "effect"
-import * as CH from "@maple-dev/effect-clickhouse"
-import * as T from "@maple-dev/effect-clickhouse/types"
+import * as CH from "@maple-dev/effect-orm"
+import * as T from "@maple-dev/effect-orm/types"
 
 const Records = CH.table("records", { Id: T.uint64, Name: T.string })
 const query = CH.from(Records)

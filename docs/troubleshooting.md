@@ -7,7 +7,7 @@ or row decoding. [Running a query](./running-queries.md#error-boundaries) separa
 
 | Symptom                                                      | Likely cause                                          | Fix                                                                                                  |
 | ------------------------------------------------------------ | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| npm returns 404 for the builder                              | The package name or configured registry is incorrect.                     | Check `@maple-dev/effect-clickhouse` and your npm registry; see [Getting started](./getting-started.md#installation-and-compatibility). |
+| npm returns 404 for the builder                              | The package name or configured registry is incorrect.                     | Check `@maple-dev/effect-orm` and your npm registry; see [Getting started](./getting-started.md#installation-and-compatibility). |
 | `Schema.TaggedError is not a function`                       | Effect 3 is installed or resolving ahead of Effect 4. | Install the documented Effect 4 version and inspect the resolved dependency tree.                    |
 | `ERR_REQUIRE_ESM` or an import cannot be loaded by `require` | The builder ships ESM.                                | Use ESM imports and `"type": "module"`, or your bundler's ESM support.                               |
 | A helper exists in source but not in the package             | A deep source import or stale local build.            | Use the seven public entry points and rebuild/reinstall your tarball.                                 |
@@ -24,7 +24,7 @@ or row decoding. [Running a query](./running-queries.md#error-boundaries) separa
 | `QueryBuilderDefect`                        | The DSL was used incorrectly.                            | Supply `select`, use order tuples, and keep parameter names valid. Do not treat it as a retryable database error. |
 | `.compileUnion` vs `.compile` type mismatch | Union queries have their own compiler.                   | Use `CH.compileUnion` for a union or wrap it with `CH.fromUnion` before `CH.compile`.                             |
 
-Expected builder errors use the tag `@maple-dev/effect-clickhouse/QueryBuilderError`.
+Expected builder errors use the tag `@maple-dev/effect-orm/QueryBuilderError`.
 [`catchTag`](./params-and-compilation.md#handling-compilation-failures) matches the full tag,
 not just `QueryBuilderError`.
 
@@ -75,4 +75,4 @@ Include the package version, resolved Effect version, runtime, and ClickHouse ve
 the problem to a table declaration, a query, the parameter shapes, and the generated SQL.
 For decoding failures include a redacted wire row and `rowSchemaSource`. Remove credentials
 and personal data: parameters are interpolated into `compiled.sql`, so the SQL may contain
-sensitive values. File a [GitHub issue](https://github.com/MapleTechLabs/effect-clickhouse/issues).
+sensitive values. File a [GitHub issue](https://github.com/MapleTechLabs/effect-orm/issues).

@@ -1,13 +1,13 @@
 import assert from "node:assert/strict"
 import { Effect, Schema } from "effect"
 import { HttpClient, HttpClientRequest } from "effect/http"
-import type * as CH from "@maple-dev/effect-clickhouse"
+import type * as CH from "@maple-dev/effect-orm"
 
-// Opt in with EFFECT_CLICKHOUSE_TEST_URL, plus _USER and _PASSWORD if needed.
+// Opt in with EFFECT_ORM_CLICKHOUSE_URL, plus _USER and _PASSWORD if needed.
 // All fixtures are SELECTs/CTEs; this suite creates no tables and writes no data.
-export const endpoint = process.env.EFFECT_CLICKHOUSE_TEST_URL
-const user = process.env.EFFECT_CLICKHOUSE_TEST_USER ?? "default"
-const password = process.env.EFFECT_CLICKHOUSE_TEST_PASSWORD ?? ""
+export const endpoint = process.env.EFFECT_ORM_CLICKHOUSE_URL
+const user = process.env.EFFECT_ORM_CLICKHOUSE_USER ?? "default"
+const password = process.env.EFFECT_ORM_CLICKHOUSE_PASSWORD ?? ""
 
 const WireRow = Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown))
 const decodeWireRow = Schema.decodeUnknownEffect(WireRow)

@@ -22,9 +22,9 @@ fixtures under `tests/`, and TypeScript release scripts under `scripts/`; build 
 For live tests against an existing local server:
 
 ```sh
-EFFECT_CLICKHOUSE_TEST_URL=http://127.0.0.1:8123 \
-EFFECT_CLICKHOUSE_TEST_USER=maple \
-EFFECT_CLICKHOUSE_TEST_PASSWORD=maple \
+EFFECT_ORM_CLICKHOUSE_URL=http://127.0.0.1:8123 \
+EFFECT_ORM_CLICKHOUSE_USER=maple \
+EFFECT_ORM_CLICKHOUSE_PASSWORD=maple \
 bun run test:clickhouse
 ```
 

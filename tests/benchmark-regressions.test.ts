@@ -4,12 +4,12 @@ import { makeHttpClient, makeHttpTransport } from "../src/benchmark/http"
 import { benchmarkSql } from "../src/benchmark/sql"
 import { parseStatement, withFormat } from "../src/sql/statement"
 
-const endpoint = process.env.EFFECT_CLICKHOUSE_TEST_URL
+const endpoint = process.env.EFFECT_ORM_CLICKHOUSE_URL
 describe.skipIf(!endpoint)("benchmark result and statement regressions against ClickHouse", () => {
 	const client = makeHttpClient({
 		url: endpoint ?? "http://localhost:8123",
-		user: process.env.EFFECT_CLICKHOUSE_TEST_USER ?? "default",
-		password: process.env.EFFECT_CLICKHOUSE_TEST_PASSWORD ?? "",
+		user: process.env.EFFECT_ORM_CLICKHOUSE_USER ?? "default",
+		password: process.env.EFFECT_ORM_CLICKHOUSE_PASSWORD ?? "",
 	})
 	const transport = makeHttpTransport(client, {
 		timeoutSeconds: 10,

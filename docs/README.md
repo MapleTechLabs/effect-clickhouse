@@ -1,6 +1,6 @@
-# Effect ClickHouse
+# Effect ORM
 
-`@maple-dev/effect-clickhouse` builds ClickHouse SQL from typed TypeScript. You describe a
+`@maple-dev/effect-orm` builds ClickHouse SQL from typed TypeScript. You describe a
 table once, and the builder infers column types, output row shapes, and join accessors from
 it. Queries are immutable values — every method returns a new query — and nothing touches the
 network: the end product is a `CompiledQuery` holding a SQL string plus a typed decoder. You
@@ -65,20 +65,20 @@ Roughly in reading order.
 
 | Import                                        | Contents                                                                                                                                                  |
 | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@maple-dev/effect-clickhouse`                | Curated public API — `from`, `compile`, `param`, expression helpers, and ClickHouse functions under friendly names (`min`, `max`, `count`, `quantile`, …) |
-| `@maple-dev/effect-clickhouse/types`          | Column-type constructors (`string`, `uint64`, `dateTime`, `map`, `array`, `nullable`, …) and the `CH*` type descriptors                                   |
-| `@maple-dev/effect-clickhouse/expr`           | Kitchen-sink namespace: every expression helper plus all ClickHouse functions under their raw names (`min_`, `toString_`, `dynamicColumn`, `not`, …)      |
-| `@maple-dev/effect-clickhouse/sql`            | The low-level `SqlFragment` AST (`raw`, `ident`, `compile`, …) for hand-rolling fragments                                                                 |
-| `@maple-dev/effect-clickhouse/benchmark`      | Driver-free suite definitions, runner, report schemas, and comparisons                                                                                    |
-| `@maple-dev/effect-clickhouse/benchmark/http` | ClickHouse HTTP transport, environment configuration, and query-log collection                                                                            |
-| `@maple-dev/effect-clickhouse/benchmark/cli`  | `runCli(args)` for embedding the bundled `ch-bench` commands                                                                                              |
+| `@maple-dev/effect-orm`                | Curated public API — `from`, `compile`, `param`, expression helpers, and ClickHouse functions under friendly names (`min`, `max`, `count`, `quantile`, …) |
+| `@maple-dev/effect-orm/types`          | Column-type constructors (`string`, `uint64`, `dateTime`, `map`, `array`, `nullable`, …) and the `CH*` type descriptors                                   |
+| `@maple-dev/effect-orm/expr`           | Kitchen-sink namespace: every expression helper plus all ClickHouse functions under their raw names (`min_`, `toString_`, `dynamicColumn`, `not`, …)      |
+| `@maple-dev/effect-orm/sql`            | The low-level `SqlFragment` AST (`raw`, `ident`, `compile`, …) for hand-rolling fragments                                                                 |
+| `@maple-dev/effect-orm/benchmark`      | Driver-free suite definitions, runner, report schemas, and comparisons                                                                                    |
+| `@maple-dev/effect-orm/benchmark/http` | ClickHouse HTTP transport, environment configuration, and query-log collection                                                                            |
+| `@maple-dev/effect-orm/benchmark/cli`  | `runCli(args)` for embedding the bundled `ch-bench` commands                                                                                              |
 
 The root barrel is curated, not exhaustive — see
 [the reference](./reference.md#whats-only-on-a-subpath) for what lives only on a subpath.
 
 ## Query benchmarks
 
-The optional `@maple-dev/effect-clickhouse/benchmark` entry point and bundled
+The optional `@maple-dev/effect-orm/benchmark` entry point and bundled
 `ch-bench` CLI measure real queries, compare fixed workloads, and save evidence.
 See [Benchmarking](./benchmarking.md) and the
 [agent playbook](./benchmark-agent.md). The root SQL builder remains driver-free.

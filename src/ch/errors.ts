@@ -34,7 +34,7 @@ import { Schema } from "effect"
  * are defects however loudly they fail.
  */
 export class QueryBuilderError extends Schema.TaggedError<QueryBuilderError>()(
-	"@maple-dev/effect-clickhouse/QueryBuilderError",
+	"@maple-dev/effect-orm/QueryBuilderError",
 	{
 		code: Schema.Literals(["UnresolvedParam", "InvalidLiteral", "InvalidArguments"]),
 		message: Schema.String,
@@ -51,6 +51,6 @@ export class QueryBuilderError extends Schema.TaggedError<QueryBuilderError>()(
  * where no `catchTag` can quietly swallow it.
  */
 export class QueryBuilderDefect extends Schema.TaggedError<QueryBuilderDefect>()(
-	"@maple-dev/effect-clickhouse/QueryBuilderDefect",
+	"@maple-dev/effect-orm/QueryBuilderDefect",
 	{ message: Schema.String },
 ) {}

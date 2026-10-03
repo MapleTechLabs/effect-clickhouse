@@ -29,7 +29,7 @@ import { tenantBoundOf, tenantPredicatesOf, withTenantBound, type TenantPredicat
 export { QueryBuilderError } from "./errors"
 
 export class CompiledQueryDecodeError extends Schema.TaggedError<CompiledQueryDecodeError>()(
-	"@maple-dev/effect-clickhouse/CompiledQueryDecodeError",
+	"@maple-dev/effect-orm/CompiledQueryDecodeError",
 	{
 		message: Schema.String,
 		rowIndex: Schema.Number,
@@ -38,7 +38,7 @@ export class CompiledQueryDecodeError extends Schema.TaggedError<CompiledQueryDe
 ) {}
 
 export class CompiledQueryEncodeError extends Schema.TaggedError<CompiledQueryEncodeError>()(
-	"@maple-dev/effect-clickhouse/CompiledQueryEncodeError",
+	"@maple-dev/effect-orm/CompiledQueryEncodeError",
 	{
 		message: Schema.String,
 		rowIndex: Schema.Number,

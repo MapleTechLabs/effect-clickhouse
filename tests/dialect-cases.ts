@@ -1,9 +1,9 @@
 // Fixtures use only public entry points, resolved through the package's built dist.
 // Raw SQL supplies deterministic input rows; the operation under test uses the DSL.
 import { DateTime } from "effect"
-import * as CH from "@maple-dev/effect-clickhouse"
-import * as F from "@maple-dev/effect-clickhouse/expr"
-import * as T from "@maple-dev/effect-clickhouse/types"
+import * as CH from "@maple-dev/effect-orm"
+import * as F from "@maple-dev/effect-orm/expr"
+import * as T from "@maple-dev/effect-orm/types"
 
 export interface DialectCase {
 	readonly metadata?: { readonly route: string; readonly tenantScope: CH.TenantScope }

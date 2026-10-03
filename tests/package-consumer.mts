@@ -2,13 +2,13 @@
 // resolve dependencies or source files from Maple's workspace.
 import assert from "node:assert/strict"
 import { Effect, Schema } from "effect"
-import * as CH from "@maple-dev/effect-clickhouse"
-import * as F from "@maple-dev/effect-clickhouse/expr"
-import * as T from "@maple-dev/effect-clickhouse/types"
-import * as Bench from "@maple-dev/effect-clickhouse/benchmark"
-import { makeHttpClient } from "@maple-dev/effect-clickhouse/benchmark/http"
-import { runCli } from "@maple-dev/effect-clickhouse/benchmark/cli"
-import * as SQL from "@maple-dev/effect-clickhouse/sql"
+import * as CH from "@maple-dev/effect-orm"
+import * as F from "@maple-dev/effect-orm/expr"
+import * as T from "@maple-dev/effect-orm/types"
+import * as Bench from "@maple-dev/effect-orm/benchmark"
+import { makeHttpClient } from "@maple-dev/effect-orm/benchmark/http"
+import { runCli } from "@maple-dev/effect-orm/benchmark/cli"
+import * as SQL from "@maple-dev/effect-orm/sql"
 
 const events = CH.table("events", { id: T.uint64, name: T.string })
 const query = CH.from(events)

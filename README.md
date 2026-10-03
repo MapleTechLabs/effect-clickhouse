@@ -1,6 +1,8 @@
-# @maple-dev/effect-clickhouse
+# @maple-dev/effect-orm
 
-Type-safe ClickHouse queries, result decoding, and reproducible benchmarks for Effect and TypeScript.
+Type-safe ClickHouse and Postgres queries, result decoding, and reproducible benchmarks for Effect and TypeScript.
+
+Formerly `@maple-dev/effect-clickhouse`.
 
 [Read the documentation](https://effect-clickhouse.maple.dev) ·
 [Getting started](./docs/getting-started.md) · [Recipes](./docs/recipes.md)
@@ -27,7 +29,7 @@ Built on [Effect](https://effect.website) (peer dependency).
 Install the package with its Effect 4 peer:
 
 ```bash
-bun add @maple-dev/effect-clickhouse "effect@^4.0.0"
+bun add @maple-dev/effect-orm "effect@^4.0.0"
 ```
 
 See [Getting started](./docs/getting-started.md) for source builds and examples.
@@ -39,8 +41,8 @@ prereleases are incompatible.
 ## Quick start
 
 ```ts
-import * as CH from "@maple-dev/effect-clickhouse"
-import * as T from "@maple-dev/effect-clickhouse/types"
+import * as CH from "@maple-dev/effect-orm"
+import * as T from "@maple-dev/effect-orm/types"
 
 // 1. Describe a table
 const Events = CH.table(
@@ -163,17 +165,17 @@ regressions live in [`src/docs-examples.test.ts`](./src/docs-examples.test.ts).
 
 | Import                               | Contents                                                                                                                                                                                        |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@maple-dev/effect-clickhouse`       | Curated public API: `from`, `compile`, `param`, expression helpers, and ClickHouse functions under friendly names (`min`, `max`, `count`, `quantile`, …).                                       |
-| `@maple-dev/effect-clickhouse/types` | Column-type constructors (`string`, `uint64`, `dateTime`, `map`, `array`, `nullable`, …) and the `CH*` type descriptors.                                                                        |
-| `@maple-dev/effect-clickhouse/expr`  | Kitchen-sink namespace: every expression helper plus all ClickHouse functions under their raw names (`min_`, `toString_`, `toStartOfInterval`, `dynamicColumn`, …). Handy for `import * as CH`. |
-| `@maple-dev/effect-clickhouse/sql`   | The low-level `SqlFragment` AST (`raw`, `ident`, `compile`, …) for hand-rolling fragments.                                                                                                      |
-| `@maple-dev/effect-clickhouse/postgres` | The Postgres dialect: `postgresDialect`, Postgres column types and functions, and a `compile` that defaults to Postgres.                                                                     |
+| `@maple-dev/effect-orm`       | Curated public API: `from`, `compile`, `param`, expression helpers, and ClickHouse functions under friendly names (`min`, `max`, `count`, `quantile`, …).                                       |
+| `@maple-dev/effect-orm/types` | Column-type constructors (`string`, `uint64`, `dateTime`, `map`, `array`, `nullable`, …) and the `CH*` type descriptors.                                                                        |
+| `@maple-dev/effect-orm/expr`  | Kitchen-sink namespace: every expression helper plus all ClickHouse functions under their raw names (`min_`, `toString_`, `toStartOfInterval`, `dynamicColumn`, …). Handy for `import * as CH`. |
+| `@maple-dev/effect-orm/sql`   | The low-level `SqlFragment` AST (`raw`, `ident`, `compile`, …) for hand-rolling fragments.                                                                                                      |
+| `@maple-dev/effect-orm/postgres` | The Postgres dialect: `postgresDialect`, Postgres column types and functions, and a `compile` that defaults to Postgres.                                                                     |
 
 ## Extending with custom functions
 
 ```ts
 import type { DateTime } from "effect"
-import { defineFn, sameAs } from "@maple-dev/effect-clickhouse"
+import { defineFn, sameAs } from "@maple-dev/effect-orm"
 
 // Declare any ClickHouse function not already wrapped. The second argument is
 // the ClickHouse type it returns — required, because that is what lets a query
@@ -195,8 +197,8 @@ run the client example too, with `CLICKHOUSE_URL`, `CLICKHOUSE_USERNAME`, and
 
 Run `bun run build`, `bun run typecheck`, and `bun run test` from this package. Tests include regressions for
 nullable results, UNION column alignment, tenant scoping, custom parameters, and DateTime64 precision.
-To include the live ClickHouse cases, set `EFFECT_CLICKHOUSE_TEST_URL` and, if needed,
-`EFFECT_CLICKHOUSE_TEST_USER` and `EFFECT_CLICKHOUSE_TEST_PASSWORD`. They use only SELECTs and CTEs.
+To include the live ClickHouse cases, set `EFFECT_ORM_CLICKHOUSE_URL` and, if needed,
+`EFFECT_ORM_CLICKHOUSE_USER` and `EFFECT_ORM_CLICKHOUSE_PASSWORD`. They use only SELECTs and CTEs.
 
 Use `bun run test:release` before publishing: it requires a live endpoint and checks the
 build, types, tests, docs, and an isolated tarball consumer. `prepublishOnly` enforces
@@ -209,7 +211,7 @@ MIT
 
 ## Query benchmarks
 
-The optional `@maple-dev/effect-clickhouse/benchmark` entry point and bundled
+The optional `@maple-dev/effect-orm/benchmark` entry point and bundled
 `ch-bench` CLI measure real queries, compare fixed workloads, and save evidence.
 See [Benchmarking](docs/benchmarking.md) and the
 [agent playbook](docs/benchmark-agent.md). The root SQL builder remains driver-free.
