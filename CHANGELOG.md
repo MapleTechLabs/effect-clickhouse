@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- Add schema-as-code and migrations for ClickHouse, all opt-in (see `docs/migrations.md`):
+  - `./schema`: `defineTable` (a `Table` that also carries its DDL), `materializedView` (its
+    body is a DSL query, type-checked against the target table), DDL rendering with replicated
+    engines and `ON CLUSTER` as render options, content-hashed snapshots, and an offline diff.
+  - `./kit` and the `effect-orm` command: `generate` writes the next migration from the schema
+    modules, asks before dropping data (or takes `--hints`, exiting 2 without them), and
+    refuses changes that need a table rebuild; `check` validates the snapshot chain and
+    branch conflicts.
+  - `./migrate`: `run`, `status`, and `verify` through a `MigrationDriver` you build from
+    your `SqlClient`. Statements are journaled one by one so a failed run resumes, applied
+    migrations have their hash checked, and `verify` compares the database with the last
+    applied snapshot.
 - Rename the package to `@maple-dev/effect-orm` and the repository to `MapleTechLabs/effect-orm`.
   Imports, error `_tag` prefixes (`@maple-dev/effect-orm/QueryBuilderError`, ...) and the live-test
   variables (`EFFECT_ORM_CLICKHOUSE_URL`, `_USER`, `_PASSWORD`) change with it.
