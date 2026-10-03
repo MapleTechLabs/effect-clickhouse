@@ -27,8 +27,9 @@ export type ParamStyle =
 	| { readonly _tag: "inline" }
 	| {
 			readonly _tag: "bind"
-			/** The placeholder for the value at 1-based `index`. */
-			readonly placeholder: (index: number) => string
+			/** The placeholder for the value at 1-based `index`, bound for a param
+			 *  of `kind` (`string`, `int`, `float`, `bool`, `dateTime`, ...). */
+			readonly placeholder: (index: number, kind: string) => string
 			/**
 			 * Whether one placeholder may stand for every use of the same param.
 			 *
@@ -49,6 +50,9 @@ export interface DialectClauses {
 	/** Whether GROUP BY resolves a select alias before an input column of the
 	 *  same name. Where it does not, keys are written by select-list position. */
 	readonly groupByAlias: boolean
+	/** Whether each `UNION ALL` branch is wrapped in parentheses. Postgres needs
+	 *  it for a branch with its own WITH, ORDER BY or LIMIT. */
+	readonly parenthesizeUnionBranches: boolean
 }
 
 /**
@@ -81,7 +85,7 @@ export const clickhouseDialect: Dialect = {
 	literal: sqlLiteral,
 	dateTimeLiteral: (value) => quoteClickHouseString(chDateTimeLiteral(value)),
 	params: { _tag: "inline" },
-	clauses: { format: true, derivedTableAlias: false, groupByAlias: true },
+	clauses: { format: true, derivedTableAlias: false, groupByAlias: true, parenthesizeUnionBranches: false },
 }
 
 // The dialect of the enclosing compile, beside the syntax installed for the

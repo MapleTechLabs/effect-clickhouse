@@ -63,6 +63,20 @@ const literal = (value: unknown, context: string): string => {
 const timestampSeconds = timestampLiteral((epochMillis) => new Date(Math.floor(epochMillis / 1000) * 1000).toISOString())
 
 /**
+ * Casts for the param kinds whose Postgres type is unambiguous. Postgres types
+ * an untyped `$n` from its context, so a float compared with an int8 column
+ * binds as int8 and rejects `19.5`, and a param in a select list binds as text.
+ * `string` and `int` stay uncast: a cast would stop them comparing with an enum
+ * or int4 column.
+ */
+const placeholderCasts: Readonly<Record<string, string>> = {
+	float: "float8",
+	bool: "boolean",
+	dateTime: "timestamptz",
+	dateTimeSeconds: "timestamptz",
+}
+
+/**
  * Postgres: double-quoted identifiers, standard string literals, and params
  * bound to `$1`, `$2`, … and returned in `CompiledQuery.parameters`.
  *
@@ -76,8 +90,12 @@ export const postgresDialect: Dialect = {
 	quoteString,
 	literal,
 	dateTimeLiteral: (value) => `TIMESTAMPTZ ${quoteString(DateTime.formatIso(value))}`,
-	params: { _tag: "bind", placeholder: (index) => `$${index}`, reuse: true },
-	clauses: { format: false, derivedTableAlias: true, groupByAlias: false },
+	params: {
+		_tag: "bind",
+		placeholder: (index, kind) => (Object.hasOwn(placeholderCasts, kind) ? `$${index}::${placeholderCasts[kind]}` : `$${index}`),
+		reuse: true,
+	},
+	clauses: { format: false, derivedTableAlias: true, groupByAlias: false, parenthesizeUnionBranches: true },
 	paramCodecs: {
 		bool: Schema.Boolean,
 		dateTime: PgTimestampLiteral,
