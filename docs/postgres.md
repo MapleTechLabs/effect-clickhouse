@@ -84,7 +84,10 @@ literal that still contained it would fail the compile with `InvalidLiteral`.
 | `custom(sql, schema, literalSchema?)` | anything | the schema's type | whatever the schema reads |
 
 `int8` and `numeric` decode to `number`, so values beyond 2^53 or a double's precision lose
-digits. Declare `PG.custom("int8", Schema.String)` where exact digits matter. A `timestamptz`
+digits. Where exact digits matter, declare
+`PG.custom("int8", Schema.Union([Schema.BigInt, Schema.BigIntFromString]))`: drivers send int8 as a
+`bigint` (PGlite, postgres.js with `types.bigint`) or as a string (node-postgres), and this reads
+both as a `bigint`. A `timestamptz`
 compared against a `Date`, a `DateTime.Utc` or a string is written as an ISO-8601 instant,
 which no session time zone can reinterpret; a zoneless string is read as UTC.
 

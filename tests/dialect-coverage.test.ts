@@ -2,7 +2,10 @@ import { readFileSync } from "node:fs"
 import { describe, expect, it } from "vitest"
 import * as CH from "@maple-dev/effect-orm"
 import * as T from "@maple-dev/effect-orm/types"
+import * as PG from "@maple-dev/effect-orm/postgres"
+import { coreCases, coreSkips } from "./core-cases"
 import { dialectCases, typeCases } from "./dialect-cases"
+import { postgresCases } from "./dialect-cases.postgres"
 
 // Discover methods and descriptors from built exports; canonical function names
 // come from the explicit barrel (the root gives some of these friendly aliases).
@@ -62,5 +65,84 @@ describe("dialect coverage manifest", () => {
 			"remove exemptions once covered",
 		).toEqual([])
 		for (const reason of Object.values(exemptions)) expect(reason.length).toBeGreaterThan(20)
+	})
+})
+
+/** Fails on what is neither covered nor exempt, on stale entries, and on exemptions a case now covers. */
+const expectManifest = (
+	inventory: readonly string[],
+	cases: ReadonlyArray<{ readonly id: string; readonly covers: readonly string[] }>,
+	exempt: Record<string, string>,
+) => {
+	const covered = new Set(cases.flatMap((fixture) => fixture.covers))
+	expect(new Set(cases.map((c) => c.id)).size, "duplicate case ids").toBe(cases.length)
+	expect(
+		inventory.filter((name) => !covered.has(name) && !Object.hasOwn(exempt, name)),
+		"missing coverage",
+	).toEqual([])
+	expect(
+		[...covered, ...Object.keys(exempt)].filter((name) => !inventory.includes(name)),
+		"stale manifest entries",
+	).toEqual([])
+	expect(
+		Object.keys(exempt).filter((name) => covered.has(name)),
+		"remove exemptions once covered",
+	).toEqual([])
+	for (const reason of Object.values(exempt)) expect(reason.length).toBeGreaterThan(20)
+}
+
+const functionsOf = (object: object, prefix: string) =>
+	Object.entries(object)
+		.filter(([name, value]) => typeof value === "function" && name !== "toFragment" && name !== "schema")
+		.map(([name]) => `${prefix}:${name}`)
+
+// The builder surface every dialect shares: query and union methods, the
+// operators on an expression and a condition, param kinds, and the root
+// functions that build a query rather than an expression.
+export const coreInventory = [
+	...new Set([
+		...methods(one, "query"),
+		...methods(CH.unionAll(one, one), "union"),
+		...functionsOf(CH.lit(1), "expr"),
+		...functionsOf(CH.lit(1).eq(1), "condition"),
+		...Object.keys(CH.param).map((name) => `param:${name}`),
+		...["from", "fromQuery", "unionAll", "lit", "not"].map((name) => `function:${name}`),
+	]),
+].sort()
+
+const coreExemptions = {
+	"param:dateTimeString":
+		"Typed for string-decoded timestamp columns, which the shared fixture does not declare. Live on ClickHouse in deep-codecs; on Postgres in the typed-literals fixture.",
+	"param:dateTimeSeconds":
+		"Typed for string-decoded timestamp columns, which the shared fixture does not declare. Live on ClickHouse in deep-codecs; on Postgres in the typed-literals fixture.",
+}
+
+describe("core coverage manifest", () => {
+	it("runs every shared builder method on every dialect, or records why not", () => {
+		expectManifest(coreInventory, coreCases, coreExemptions)
+		for (const [dialect, skips] of Object.entries(coreSkips)) {
+			for (const [id, reason] of Object.entries(skips)) {
+				expect(coreCases.some((fixture) => fixture.id === id), `${dialect} skips unknown case ${id}`).toBe(true)
+				expect(reason.length).toBeGreaterThan(20)
+			}
+		}
+	})
+})
+
+// Every runtime export of the ./postgres entry.
+export const postgresInventory = Object.keys(PG)
+	.map((name) => `pg:${name}`)
+	.sort()
+
+const postgresExemptions = {
+	"pg:PgNumber": "Wire codec behind every numeric type; the types fixture decodes it from number, bigint and string.",
+	"pg:timestampLiteral":
+		"Factory for timestamp literal codecs; its instances (PgTimestampLiteral, dateTimeSeconds) are exercised.",
+}
+
+describe("postgres coverage manifest", () => {
+	it("runs every export of the postgres entry, or records why not", () => {
+		expect(postgresInventory.length).toBeGreaterThan(0)
+		expectManifest(postgresInventory, postgresCases, postgresExemptions)
 	})
 })
