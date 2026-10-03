@@ -13,7 +13,8 @@
 
 import { Result, Schema } from "effect"
 import { QueryBuilderError } from "./errors"
-import { escapeClickHouseString } from "../sql/sql-fragment"
+import { quoteClickHouseString } from "../sql/sql-fragment"
+import { activeSqlSyntax } from "../sql/sql-syntax"
 import type { CHType } from "./types"
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
@@ -48,7 +49,7 @@ const oneLine = (failure: unknown): string =>
  */
 export function sqlLiteral(value: unknown, context: string): string {
 	if (value === null) return "NULL"
-	if (typeof value === "string") return `'${escapeClickHouseString(value)}'`
+	if (typeof value === "string") return quoteClickHouseString(value)
 	if (typeof value === "bigint") return String(value)
 	if (typeof value === "boolean") return value ? "1" : "0"
 
@@ -88,6 +89,16 @@ export function sqlLiteral(value: unknown, context: string): string {
  * fails here — while building the SQL — instead of becoming part of it.
  */
 export function encodeLiteral<A>(schema: Schema.Codec<A, any>, value: unknown, context: string): string {
+	return (activeSqlSyntax()?.literal ?? sqlLiteral)(encodeValue(schema, value, context), context)
+}
+
+/**
+ * Encode a value through a schema to its wire form, without writing SQL.
+ *
+ * The half of {@link encodeLiteral} a dialect that binds params needs: the
+ * driver sends the wire value itself, so there is no literal to write.
+ */
+export function encodeValue<A>(schema: Schema.Codec<A, any>, value: unknown, context: string): unknown {
 	const encoded = Schema.encodeUnknownResult(schema)(value)
 	if (Result.isFailure(encoded)) {
 		throw new QueryBuilderError({
@@ -95,7 +106,7 @@ export function encodeLiteral<A>(schema: Schema.Codec<A, any>, value: unknown, c
 			message: `${context}: ${describe(value)} is not a valid value — ${oneLine(encoded.failure)}`,
 		})
 	}
-	return sqlLiteral(encoded.success, context)
+	return encoded.success
 }
 
 /** `encodeLiteral` against a column type, naming the column in any failure. */

@@ -147,6 +147,7 @@ CH.compileUnsafe(query, params, options?)  // CompiledQuery, throws
 | `options.rowSchema`   | Effect `Schema` used by `decodeRows` / `decodeFirstRow`              |
 | `options.skipFormat`  | Omit a trailing `FORMAT` clause (used internally for subqueries)     |
 | `options.deferParams` | Leave placeholders unresolved, for SQL spliced into an outer compile |
+| `options.dialect`     | How params reach the server; `clickhouseDialect` when omitted        |
 
 `compileCH` is the internal name; the package exports it as `compile`. Unions use
 `compileUnion(union, params)`.
@@ -156,6 +157,7 @@ CH.compileUnsafe(query, params, options?)  // CompiledQuery, throws
 ```ts
 interface CompiledQuery<Output> {
 	readonly sql: string
+	readonly parameters: ReadonlyArray<unknown>
 	readonly tenantScope: "single-tenant" | "cross-tenant" | "untenanted"
 	readonly rowSchemaSource: "declared" | "derived" | "none"
 	readonly rowSchema: CompiledQueryRowSchema<Output> | undefined
@@ -172,6 +174,7 @@ interface CompiledQuery<Output> {
 | Field                           | Purpose                                                                                  |
 | ------------------------------- | ---------------------------------------------------------------------------------------- |
 | `sql`                           | The statement to execute. The builder never runs it.                                     |
+| `parameters`                    | Values a binding dialect sends beside `sql`, in placeholder order; empty by default      |
 | `tenantScope`                   | Whether the query pins a single tenant — see [Tenant scoping](./tenant-scoping.md)       |
 | `rowSchemaSource`               | Where the row schema came from, so a caller can tell real validation from a pass-through |
 | `rowSchema`                     | The codec itself, for a caller that needs a `Schema` rather than a call                  |
@@ -183,6 +186,53 @@ interface CompiledQuery<Output> {
 | `encodeRows`                    | The same codec backwards — decoded rows to the wire shape                                |
 
 Use `decodeRows` to validate wire values against the row schema.
+
+## Dialects
+
+A `Dialect` is the database a query is compiled for: how identifiers and literals are written,
+how resolved params reach the server, and which clauses exist. It is installed for the length of
+the compile, so every column reference, string fragment, compared value and inline param goes
+through it. The default, `clickhouseDialect`, writes names bare and each param value into the SQL
+as a ClickHouse literal, and leaves `parameters` empty. `postgresDialect`, from the `/postgres`
+entry point, is the other built-in one; see [Postgres](./postgres.md).
+
+A dialect whose `params` style is `bind` leaves a placeholder instead and returns the encoded
+values in `parameters`, numbered once across the whole statement, unions and subqueries
+included:
+
+```ts
+const numbered: CH.Dialect = {
+	...CH.clickhouseDialect,
+	name: "numbered",
+	params: { _tag: "bind", placeholder: (index) => `$${index}`, reuse: true },
+}
+
+const compiled = CH.compileUnsafe(query, { orgId: "org_1" }, { dialect: numbered })
+// compiled.sql:        ... WHERE OrgId = $1
+// compiled.parameters: ["org_1"]
+```
+
+`reuse: true` lets one numbered placeholder stand for every use of a param; set it to `false`
+for positional `?` placeholders, which bind a value each time they appear. Either way a bound
+value is the column codec's wire form, the same value an inline literal is written from, and a
+missing or ill-typed param still fails the compile. `paramCodecs` re-encodes a portable param
+kind where the database wants another form: Postgres binds `param.bool` as a boolean rather
+than `1`/`0`.
+
+| Member | Purpose |
+| --- | --- |
+| `quoteIdent` | One identifier: a column, alias, table or schema name |
+| `quoteString`, `literal` | A string, or any encoded wire value, as a literal |
+| `dateTimeLiteral` | A point in time compared against an expression with no declared type |
+| `params` | `inline`, or `bind` with a placeholder function |
+| `clauses.format` | Whether `FORMAT` exists; `.format()` fails to compile where it does not |
+| `clauses.derivedTableAlias` | Whether a subquery in FROM needs an alias |
+| `clauses.groupByAlias` | Whether GROUP BY resolves select aliases; if not, keys are written by position |
+| `paramCodecs` | Per-kind codec overrides for `param.*` |
+
+Params are resolved by rewriting placeholders in the finished SQL, so a dialect's literals must
+never spell the param marker `__PARAM_`. ClickHouse writes it as `\x5F_PARAM_`; a literal that
+does contain the marker fails the compile with `InvalidLiteral` rather than being rewritten.
 
 ## Handwritten SQL
 

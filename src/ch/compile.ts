@@ -12,12 +12,13 @@ import type { CHQuery, CHQueryState } from "./query"
 import type { CHUnionQuery } from "./union"
 import { createQualifiedColumnAccessor, createJoinedColumnAccessor, sourceAlias } from "./query"
 import { aliased, columnTypeOf } from "./expr"
-import { raw, ident, escapeClickHouseString, compile as compileSqlFragment } from "../sql/sql-fragment"
+import { raw, identPath, quoteIdent, quoteIdentPath, compile as compileSqlFragment } from "../sql/sql-fragment"
 import { splitTerminalClauses } from "../sql/terminal-clauses"
 import { compileQuery, type SqlQuery } from "../sql/sql-query"
 import { PARAM_MARKER_PREFIX, PARAM_PLACEHOLDER_PATTERN, paramSchema, type ParamKind } from "./param"
 import { mergeResultSchemas } from "./define-fn"
-import { encodeLiteral } from "./literal"
+import { encodeValue } from "./literal"
+import { checkedLiteral, clickhouseDialect, currentDialect, withDialect, type Dialect } from "./dialect"
 import { Effect, Option, Schema } from "effect"
 import { QueryBuilderDefect, QueryBuilderError } from "./errors"
 import { withSubqueryCompiler } from "./subquery-context"
@@ -64,8 +65,33 @@ const orderByClause = (specs: ReadonlyArray<[string, "asc" | "desc"]>): Array<st
 				message: `CHQuery: orderBy() direction must be "asc" or "desc", got ${JSON.stringify(direction)}`,
 			})
 		}
-		return `${column} ${direction.toUpperCase()}`
+		return `${quoteIdent(column)} ${direction.toUpperCase()}`
 	})
+
+/**
+ * A `groupBy` key: the select alias where the dialect resolves aliases there,
+ * otherwise the selected column's position. Postgres reads a bare name in
+ * GROUP BY as an input column first, so `select({ Service: lower(…) })` grouped
+ * by `"Service"` would group by the raw column; `GROUP BY 1` cannot be misread.
+ */
+const groupByKey = (key: string, selected: ReadonlyArray<string>): string => {
+	const position = selected.indexOf(key)
+	return currentDialect().clauses.groupByAlias || position === -1 ? quoteIdent(key) : String(position + 1)
+}
+
+/** `.format()`'s value, refused for a dialect that has no `FORMAT` clause:
+ *  dropping it would hand the caller rows in a shape they did not ask for. A
+ *  defect, because the format is written in the query definition. */
+const formatClause = (format: string | undefined): string | undefined => {
+	if (format === undefined) return undefined
+	const dialect = currentDialect()
+	if (!dialect.clauses.format) {
+		throw new QueryBuilderDefect({
+			message: `CHQuery: format(${JSON.stringify(format)}) has no meaning for the ${dialect.name} dialect, which has no FORMAT clause`,
+		})
+	}
+	return format
+}
 
 // CompiledQuery — bundles the SQL string with its output type so consumers
 // never need to cast manually.
@@ -101,6 +127,13 @@ interface ResolvedCte {
 
 interface CompiledQueryBase<Output> {
 	readonly sql: string
+	/**
+	 * The values a binding dialect sends beside `sql`, in placeholder order.
+	 *
+	 * Empty when the dialect writes params into the SQL as literals, which is
+	 * what ClickHouse (the default) does.
+	 */
+	readonly parameters: ReadonlyArray<unknown>
 	readonly tenantScope: TenantScope
 	/**
 	 * Where the query's row schema came from, or `"none"` if it has none.
@@ -282,6 +315,7 @@ const compareRowSchemas = (declared: unknown, derived: unknown): RowSchemaMismat
 
 const makeCompiledQuery = <Output, Route extends string | undefined>(
 	sql: string,
+	parameters: ReadonlyArray<unknown>,
 	tenantScope: TenantScope,
 	rowSchemaSource: "declared" | "derived" | "none",
 	/** Built on first decode: a derived schema costs a `Schema.Struct` per
@@ -352,6 +386,7 @@ const makeCompiledQuery = <Output, Route extends string | undefined>(
 
 	return {
 		sql,
+		parameters,
 		tenantScope,
 		// Resolved eagerly only here, where the getter is already memoised by
 		// `decodeRow`/`encodeRow` below; reading it does not build a second one.
@@ -412,6 +447,7 @@ export const rawCompiledQuery = <
 }): CompiledQuery<Output, Route> =>
 	makeCompiledQuery(
 		args.sql,
+		[],
 		args.tenantScope,
 		args.rowSchema === undefined ? "none" : "declared",
 		() => args.rowSchema,
@@ -468,6 +504,7 @@ export const compileCH = <
 		skipFormat?: boolean
 		rowSchema?: CompiledQueryRowSchema<Decoded>
 		deferParams?: boolean
+		dialect?: Dialect
 	},
 ): Effect.Effect<CompiledQuery<Decoded, Route>, QueryBuilderError> =>
 	asEffect(() => compileCHUnsafe(query, params, options))
@@ -476,7 +513,7 @@ export const compileCH = <
 export const compileUnion = <Output extends Record<string, any>, Params extends Record<string, any>>(
 	union: CHUnionQuery<Output>,
 	params: Params,
-	options?: { rowSchema?: CompiledQueryRowSchema<Output>; deferParams?: boolean },
+	options?: { rowSchema?: CompiledQueryRowSchema<Output>; deferParams?: boolean; dialect?: Dialect },
 ): Effect.Effect<CompiledQuery<Output, undefined>, QueryBuilderError> =>
 	asEffect(() => compileUnionUnsafe(union, params, options))
 
@@ -497,9 +534,11 @@ export function compileCHUnsafe<
 		 *  For fragments spliced into a larger query — a subquery condition — whose
 		 *  params are resolved by the outer compilation pass. */
 		deferParams?: boolean
+		/** How params reach the server. ClickHouse literals when omitted. */
+		dialect?: Dialect
 	},
 ): CompiledQuery<Decoded, Route> {
-	return compileInner(query, params, options)
+	return withDialect(options?.dialect ?? currentDialect(), () => compileInner(query, params, options))
 }
 
 /**
@@ -531,6 +570,12 @@ function compileInner<
 		 *  For fragments spliced into a larger query — a subquery condition — whose
 		 *  params are resolved by the outer compilation pass. */
 		deferParams?: boolean
+		/**
+		 * Set by a compile that splices this query's SQL into its own: the
+		 * outer one resolves params once over the whole statement, which a
+		 * dialect that numbers its placeholders depends on.
+		 */
+		nested?: boolean
 		/**
 		 * The tenant scopes of CTEs an enclosing query has already resolved.
 		 *
@@ -591,6 +636,7 @@ function compileInner<
 			const compiled = compileInner(c.query, params, {
 				skipFormat: true,
 				deferParams,
+				nested: true,
 				enclosingCtes: [...(options?.enclosingCtes ?? []), ...resolvedCtes],
 			})
 			resolvedCtes.push({
@@ -629,19 +675,21 @@ function compileInner<
 		const inner = compileInner(state.fromQuery, params, {
 			skipFormat: true,
 			deferParams,
+			nested: true,
 			enclosingCtes: visibleCtes,
 		})
 		fromSource = sourceOf(inner)
-		fromFragment = raw(`(${inner.sql}) AS ${state.fromQueryAlias}`)
+		fromFragment = raw(`(${inner.sql}) AS ${quoteIdent(state.fromQueryAlias ?? "")}`)
 	} else if (state.fromUnion) {
-		const inner = compileUnionUnsafe(state.fromUnion, params, { deferParams, enclosingCtes: visibleCtes })
+		const inner = compileUnionInner(state.fromUnion, params, { deferParams, nested: true, enclosingCtes: visibleCtes })
 		fromSource = sourceOf(inner)
-		fromFragment = raw(`(\n${splitTerminalClauses(inner.sql).body}\n) AS ${state.fromQueryAlias}`)
+		const body = currentDialect().clauses.format ? splitTerminalClauses(inner.sql).body : inner.sql
+		fromFragment = raw(`(\n${body}\n) AS ${quoteIdent(state.fromQueryAlias ?? "")}`)
 	} else {
 		fromSource = sourceForTable(state.tableName, mainColumn)
 		fromFragment = mainAlias !== state.tableName
-			? raw(`${state.tableName} AS ${mainAlias}`)
-			: ident(state.tableName)
+			? raw(`${quoteIdentPath(state.tableName)} AS ${quoteIdentPath(mainAlias)}`)
+			: identPath(state.tableName)
 	}
 
 	const sources: TenantSource[] = [fromSource]
@@ -655,6 +703,7 @@ function compileInner<
 		const compiled = compileInner(subquery, params, {
 			skipFormat: true,
 			deferParams,
+			nested: true,
 			enclosingCtes: visibleCtes,
 		})
 		sources.push(sourceOf(compiled))
@@ -667,12 +716,13 @@ function compileInner<
 				const compiled = compileInner(j.innerQuery, params, {
 					skipFormat: true,
 					deferParams,
+					nested: true,
 					enclosingCtes: visibleCtes,
 				})
 				tableSql = `(${compiled.sql})`
 				source = sourceOf(compiled)
 			} else if (j.tableName) {
-				tableSql = j.tableName
+				tableSql = quoteIdentPath(j.tableName)
 				source = sourceForTable(
 					j.tableName,
 					j.tenantColumn === undefined ? undefined : `${j.alias}.${j.tenantColumn}`,
@@ -698,7 +748,7 @@ function compileInner<
 			return {
 				type: j.type,
 				table: tableSql,
-				alias: j.alias,
+				alias: quoteIdent(j.alias),
 				on: on ? compileSqlFragment(on.toFragment()) : undefined,
 			}
 		})
@@ -708,7 +758,7 @@ function compileInner<
 			from: fromFragment,
 			joins,
 			where: whereFragments,
-			groupBy: state.groupByKeys.map((k) => raw(k)),
+			groupBy: state.groupByKeys.map((k) => raw(groupByKey(k, options?.selectKeys ?? keys))),
 			// Deliberately excluded from tenant evidence: by HAVING time the
 			// rows are already aggregated, so the scan that produced them crossed
 			// tenants no matter what this filters out.
@@ -718,7 +768,7 @@ function compileInner<
 			orderBy: orderByClause(state.orderBySpecs).map(raw),
 			limit: state.limitValue != null ? raw(String(Math.round(state.limitValue))) : undefined,
 			offset: state.offsetValue != null ? raw(String(Math.round(state.offsetValue))) : undefined,
-			format: options?.skipFormat ? undefined : state.formatValue,
+			format: options?.skipFormat ? undefined : formatClause(state.formatValue),
 		}
 
 		return compileQuery(sqlQuery)
@@ -726,14 +776,21 @@ function compileInner<
 
 	// Prepend CTE definitions
 	if (resolvedCtes.length > 0) {
-		const cteDefs = resolvedCtes.map((c) => `${c.name} AS (\n${c.sql}\n)`).join(",\n")
+		const cteDefs = resolvedCtes.map((c) => `${quoteIdent(c.name)} AS (\n${c.sql}\n)`).join(",\n")
 		sql = `WITH ${cteDefs}\n${sql}`
 	}
 
-	if (!deferParams) sql = resolveParams(sql, params)
+	// Once, at the top: a nested query's SQL is spliced into this one, and a
+	// dialect that binds numbers its placeholders across the whole statement.
+	let parameters: ReadonlyArray<unknown> = []
+	if (!deferParams && options?.nested !== true) {
+		const rendered = renderParams(sql, params, currentDialect())
+		sql = rendered.sql
+		parameters = rendered.parameters
+	}
 
 	const scope = deriveTenantScope(sources, [{ predicates: wherePredicates }, ...joinPredicates], (value) =>
-		deferParams ? compileSqlFragment(value) : resolveParams(compileSqlFragment(value), params),
+		deferParams ? compileSqlFragment(value) : inlineParams(compileSqlFragment(value), params),
 	)
 	const tenantScope = state.crossTenant === true ? "cross-tenant" : scope.scope
 
@@ -743,6 +800,7 @@ function compileInner<
 	return withTenantBound(
 		makeCompiledQuery<Decoded, Route>(
 			sql,
+			parameters,
 			tenantScope,
 			options?.rowSchema !== undefined ? "declared" : derivedSchema ? "derived" : "none",
 			() => options?.rowSchema ?? (derivedSchema as CompiledQueryRowSchema<Decoded> | undefined),
@@ -976,8 +1034,24 @@ export function compileUnionUnsafe<Output extends Record<string, any>, Params ex
 	options?: {
 		rowSchema?: CompiledQueryRowSchema<Output>
 		deferParams?: boolean
-		/** Internal — see `compileInner`'s option of the same name. A union in a
-		 * later CTE's FROM must still see its earlier scoped siblings. */
+		dialect?: Dialect
+	},
+): CompiledQuery<Output, undefined> {
+	return withDialect(options?.dialect ?? currentDialect(), () => compileUnionInner(union, params, options))
+}
+
+/** The recursion behind {@link compileUnionUnsafe}; see {@link compileInner}. */
+function compileUnionInner<Output extends Record<string, any>, Params extends Record<string, any>>(
+	union: CHUnionQuery<Output>,
+	params: Params,
+	options?: {
+		rowSchema?: CompiledQueryRowSchema<Output>
+		deferParams?: boolean
+		/** Set by a compile that splices this union's SQL into its own, and so
+		 *  resolves its params itself. */
+		nested?: boolean
+		/** A union in a later CTE's FROM must still see its earlier scoped
+		 *  siblings. See `compileInner`'s option of the same name. */
 		enclosingCtes?: ReadonlyArray<ResolvedCte>
 	},
 ): CompiledQuery<Output, undefined> {
@@ -990,7 +1064,7 @@ export function compileUnionUnsafe<Output extends Record<string, any>, Params ex
 	if (first === undefined) throw new QueryBuilderDefect({ message: "unionAll requires at least one query" })
 	const selectKeys = Object.keys(selectExprsOf(first) ?? {})
 	const subQueries = state.queries.map((q) =>
-		compileInner(q, params, { skipFormat: true, deferParams, selectKeys, enclosingCtes }),
+		compileInner(q, params, { skipFormat: true, deferParams, nested: true, selectKeys, enclosingCtes }),
 	)
 	const bounds = new Set(
 		subQueries.flatMap((q) => {
@@ -1019,7 +1093,7 @@ export function compileUnionUnsafe<Output extends Record<string, any>, Params ex
 		state.outerOrderBySpecs.length > 0 || state.outerLimitValue != null || state.outerOffsetValue != null
 
 	if (hasOuter) {
-		sql = `SELECT * FROM (\n${sql}\n)`
+		sql = `SELECT * FROM (\n${sql}\n)${currentDialect().clauses.derivedTableAlias ? ` AS ${quoteIdent("__union")}` : ""}`
 		if (state.outerOrderBySpecs.length > 0) {
 			sql += `\nORDER BY ${orderByClause(state.outerOrderBySpecs).join(", ")}`
 		}
@@ -1031,8 +1105,16 @@ export function compileUnionUnsafe<Output extends Record<string, any>, Params ex
 		}
 	}
 
-	if (state.formatValue) {
-		sql += `\nFORMAT ${state.formatValue}`
+	const format = formatClause(state.formatValue)
+	if (format) {
+		sql += `\nFORMAT ${format}`
+	}
+
+	let parameters: ReadonlyArray<unknown> = []
+	if (!deferParams && options?.nested !== true) {
+		const rendered = renderParams(sql, params, currentDialect())
+		sql = rendered.sql
+		parameters = rendered.parameters
 	}
 
 	// A union decodes as its branches do — but not as its FIRST branch does.
@@ -1048,6 +1130,7 @@ export function compileUnionUnsafe<Output extends Record<string, any>, Params ex
 	return withTenantBound(
 		makeCompiledQuery<Output, undefined>(
 			sql,
+			parameters,
 			tenantScope,
 			options?.rowSchema !== undefined ? "declared" : derivedSchema ? "derived" : "none",
 			() => options?.rowSchema ?? (derivedSchema as CompiledQueryRowSchema<Output> | undefined),
@@ -1063,26 +1146,47 @@ export function compileUnionUnsafe<Output extends Record<string, any>, Params ex
 }
 
 /**
- * Substitute every `__PARAM_<kind>_<name>__` placeholder with its value.
+ * Substitute every `__PARAM_<kind>_<name>__` placeholder, the way the dialect
+ * sends params: as literals written into the SQL, or as bind placeholders whose
+ * encoded values come back in `parameters`.
  *
- * Params are resolved here rather than sent as ClickHouse query parameters, so
- * a value that never arrives, or arrives as the wrong type, would otherwise
+ * Params are resolved here rather than handed to the driver unchecked, so a
+ * value that never arrives, or arrives as the wrong type, would otherwise
  * become part of the SQL text: a missing param used to ship the placeholder
  * itself to the server, and a `Date` handed to a dateTime param used to
- * stringify as `Thu Jan 01 2026 …`. Both are now compile-time failures.
+ * stringify as `Thu Jan 01 2026 …`. Both are compile-time failures, whichever
+ * way the dialect sends values.
  *
  * Params the query doesn't mention are ignored — one bag of params is commonly
  * shared across a family of queries.
  */
-function resolveParams(sql: string, params: Record<string, unknown>): string {
+function renderParams(
+	sql: string,
+	params: Record<string, unknown>,
+	dialect: Dialect,
+): { readonly sql: string; readonly parameters: ReadonlyArray<unknown> } {
 	const missing: Array<string> = []
+	const parameters: Array<unknown> = []
+	// Keyed by kind and name: `dateTime` and `dateTimeSeconds` read one value
+	// and encode it differently, so they are two bound values, not one.
+	const bound = new Map<string, string>()
+	const style = dialect.params
 
 	const resolved = sql.replace(PARAM_PLACEHOLDER_PATTERN, (placeholder, kind: string, name: string) => {
 		if (!(name in params)) {
 			missing.push(name)
 			return placeholder
 		}
-		return resolveParam(kind as ParamKind, name, params[name])
+		const value = encodeParam(dialect, kind as ParamKind, name, params[name])
+		if (style._tag === "inline") return checkedLiteral(dialect, value, paramContext(kind, name))
+
+		const key = `${kind}\0${name}`
+		const existing = style.reuse ? bound.get(key) : undefined
+		if (existing !== undefined) return existing
+		parameters.push(value)
+		const marker = style.placeholder(parameters.length)
+		bound.set(key, marker)
+		return marker
 	})
 
 	if (missing.length > 0) {
@@ -1105,18 +1209,29 @@ function resolveParams(sql: string, params: Record<string, unknown>): string {
 		})
 	}
 
-	return resolved
+	return { sql: resolved, parameters }
 }
 
 /**
- * A param value as a ClickHouse literal, through its declared type's codec.
+ * A fragment with its params written in as ClickHouse literals.
+ *
+ * Only for tenant bounds, which are compared with each other as text and never
+ * sent anywhere, so they render the same whatever the query's dialect.
+ */
+const inlineParams = (sql: string, params: Record<string, unknown>): string =>
+	renderParams(sql, params, clickhouseDialect).sql
+
+const paramContext = (kind: string, name: string): string => `param '${name}' (${kind})`
+
+/**
+ * A param value encoded to its wire form, through its declared type's codec.
  *
  * The same schema that decodes a column of that type runs backwards here, so
  * the two directions cannot drift: a `DateTime` param and a `DateTime` column
  * agree on the literal by construction, not by two functions being kept in sync.
  */
-function resolveParam(kind: ParamKind, name: string, value: unknown): string {
-	const schema = paramSchema(kind)
+function encodeParam(dialect: Dialect, kind: ParamKind, name: string, value: unknown): unknown {
+	const schema = dialect.paramCodecs?.[kind] ?? paramSchema(kind)
 	if (schema === undefined) {
 		// Only reachable from a hand-written placeholder naming a kind nothing
 		// declared: `param.of` registers its type before it can reach any SQL —
@@ -1125,5 +1240,5 @@ function resolveParam(kind: ParamKind, name: string, value: unknown): string {
 			message: `compile: param '${name}' has an unknown type '${kind}'`,
 		})
 	}
-	return encodeLiteral(schema, value, `param '${name}' (${kind})`)
+	return encodeValue(schema, value, paramContext(kind, name))
 }

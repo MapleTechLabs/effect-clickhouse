@@ -1,4 +1,5 @@
 import { Data } from "effect"
+import { activeSqlSyntax } from "./sql-syntax"
 
 // ClickHouse string escaping
 
@@ -27,17 +28,37 @@ export function escapeClickHouseString(value: string): string {
 		.replace(/__PARAM_/g, "\\x5F_PARAM_")
 }
 
+/** A string as a ClickHouse literal: quoted, and escaped as above. */
+export const quoteClickHouseString = (value: string): string => `'${escapeClickHouseString(value)}'`
+
+/** A string literal in the syntax of the dialect being compiled for, or
+ *  ClickHouse's outside a compile. */
+const quoteString = (value: string): string => (activeSqlSyntax()?.quoteString ?? quoteClickHouseString)(value)
+
+/** One identifier in the syntax of the dialect being compiled for. ClickHouse
+ *  names are written bare, which is also the rendering outside a compile. */
+export const quoteIdent = (name: string): string => activeSqlSyntax()?.quoteIdent(name) ?? name
+
+/** A dotted path (`db.table`, `alias.Column`) with each segment quoted. */
+export const quoteIdentPath = (path: string): string => path.split(".").map(quoteIdent).join(".")
+
 // SQL Fragment AST
 
 export type SqlFragment = Data.TaggedEnum<{
 	/** Raw SQL string — no escaping. For ClickHouse-specific syntax. */
 	Raw: { readonly sql: string }
-	/** Auto-escaped string parameter: produces 'escaped_value' */
+	/** A string literal, quoted and escaped by the dialect being compiled for */
 	Str: { readonly value: string }
 	/** Integer parameter: produces the number as string, rounded */
 	Int: { readonly value: number }
-	/** Column or table identifier (unquoted — ClickHouse style) */
-	Ident: { readonly name: string }
+	/**
+	 * An identifier, quoted by the dialect being compiled for.
+	 *
+	 * `name` is one identifier and is never split, so a ClickHouse `Nested`
+	 * column such as `Events.Name` stays whole. `qualifier` is the dotted path in
+	 * front of it (`alias`, `db.table`), quoted segment by segment.
+	 */
+	Ident: { readonly name: string; readonly qualifier?: string }
 	/** A list of fragments joined by a separator (empty strings from When(false) are filtered) */
 	Join: { readonly separator: string; readonly fragments: ReadonlyArray<SqlFragment> }
 	/** An aliased expression: <expr> AS <alias> */
@@ -64,7 +85,13 @@ const Frag = Data.taggedEnum<SqlFragment>()
 export const raw = (sql: string): SqlFragment => Frag.Raw({ sql })
 export const str = (value: string): SqlFragment => Frag.Str({ value })
 export const int = (value: number): SqlFragment => Frag.Int({ value })
-export const ident = (name: string): SqlFragment => Frag.Ident({ name })
+export const ident = (name: string, qualifier?: string): SqlFragment =>
+	Frag.Ident(qualifier === undefined ? { name } : { name, qualifier })
+/** A dotted path such as `db.table`, split into qualifier and name. */
+export const identPath = (path: string): SqlFragment => {
+	const dot = path.lastIndexOf(".")
+	return dot === -1 ? ident(path) : ident(path.slice(dot + 1), path.slice(0, dot))
+}
 export const join = (separator: string, ...fragments: ReadonlyArray<SqlFragment>): SqlFragment =>
 	Frag.Join({ separator, fragments })
 export const as_ = (expr: SqlFragment, alias: string): SqlFragment => Frag.As({ expr, alias })
@@ -76,11 +103,12 @@ export const lazy = (render: () => string): SqlFragment => Frag.Lazy({ render })
 
 export const compile: (fragment: SqlFragment) => string = Frag.$match({
 	Raw: ({ sql }) => sql,
-	Str: ({ value }) => `'${escapeClickHouseString(value)}'`,
+	Str: ({ value }) => quoteString(value),
 	Int: ({ value }) => String(Math.round(value)),
-	Ident: ({ name }) => name,
+	Ident: ({ name, qualifier }) =>
+		qualifier === undefined ? quoteIdent(name) : `${quoteIdentPath(qualifier)}.${quoteIdent(name)}`,
 	Join: ({ separator, fragments }) => fragments.map(compile).filter(Boolean).join(separator),
-	As: ({ expr, alias }) => `${compile(expr)} AS ${alias}`,
+	As: ({ expr, alias }) => `${compile(expr)} AS ${quoteIdent(alias)}`,
 	When: ({ condition, fragment }) => (condition ? compile(fragment) : ""),
 	Lazy: ({ render }) => render(),
 })

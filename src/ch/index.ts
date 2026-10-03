@@ -257,6 +257,9 @@ export {
 	CompiledQueryEncodeError,
 } from "./compile"
 
+// Dialects: how a compiled query's params reach the server.
+export { clickhouseDialect, type Dialect, type DialectClauses, type ParamStyle } from "./dialect"
+
 // Failures vs defects — the rule the two classes encode is on `QueryBuilderError`.
 export { QueryBuilderError, QueryBuilderDefect } from "./errors"
 

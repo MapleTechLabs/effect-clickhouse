@@ -101,6 +101,13 @@ const escapedSql = await import("./escaped-sql")
 const fragments = await import("@maple-dev/effect-clickhouse/sql")
 assert.equal(escapedSql.predicate, "Name = " + fragments.compile(fragments.str("O'Reilly")))
 assert.doesNotMatch(escapedSql.predicate, /\\[object Object\\]/)
+const postgres = await import("./postgres-quickstart")
+assert.deepEqual(postgres.compiled.parameters, ["org_1", "2026-01-01T00:00:00.000Z"])
+assert.ok(sql(postgres.compiled).includes('"requests"."OrgId" = $1 AND "requests"."At" >= $2'))
+assert.deepEqual(postgres.rows, [
+  { route: "/checkout", count: 2, slow: 1, p50: 510 },
+  { route: "/search", count: 1, slow: 0, p50: 40 },
+])
 console.log("Markdown example behavior checks passed")
 `,
 	)
