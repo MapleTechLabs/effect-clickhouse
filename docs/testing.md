@@ -66,6 +66,29 @@ suite additionally checks unmatched joins under both settings and DateTime64 bou
 Fixtures pin the session timezone to UTC, matching the timestamp codecs' wire contract.
 Both JSON and JSONEachRow response formats are exercised.
 
+## One builder suite, every dialect
+
+`tests/core-cases.ts` holds the builder cases every dialect runs: selection, the shared
+operators, params, grouping, joins on tables and subqueries, CTEs, unions, routing, and
+`format`. A case builds its query from a `CoreContext`, which supplies the dialect's column
+types, aggregate catalog and `compile`, and reads the same fixture rows on every database
+(a `WITH` over `values(...)` on ClickHouse and `VALUES` on Postgres, so nothing is written).
+
+- `tests/core.clickhouse.test.ts` runs them live, under both `join_use_nulls` settings.
+- `tests/core.postgres.test.ts` runs them on PGlite (Postgres 17) on every `vitest run`.
+- `tests/core-sql.test.ts` snapshots the exact SQL and `parameters` per dialect.
+
+Where the databases genuinely disagree, the case says so: `expectedBy` gives a target its
+own rows (`/` is integer division on Postgres; ClickHouse fills a missing join row with
+defaults unless `join_use_nulls=1`), and `rejects` names a dialect that must refuse to
+compile it (`format` on Postgres). A case a dialect cannot run yet goes in `coreSkips`
+with a reason. The core manifest in `tests/dialect-coverage.test.ts` requires every query
+and union method, expression and condition operator, and param kind to have a core case.
+
+Postgres functions and types have their own manifest: every export of the `./postgres`
+entry is run by a case in `tests/dialect-cases.postgres.ts` (`tests/dialect.postgres.test.ts`)
+or exempted with a reason.
+
 Tests preserve documented behavior: arithmetic chains follow SQL precedence, not call
 order, and `windowFunnel` with `strict_order` rejects intervening events.
 
