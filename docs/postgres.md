@@ -8,8 +8,8 @@ types whose codecs read what Postgres drivers send, functions spelled the Postgr
 ```ts title="postgres-quickstart.ts"
 import { PGlite } from "@electric-sql/pglite"
 import { Effect } from "effect"
-import * as CH from "@maple-dev/effect-clickhouse"
-import * as PG from "@maple-dev/effect-clickhouse/postgres"
+import * as CH from "@maple-dev/effect-orm"
+import * as PG from "@maple-dev/effect-orm/postgres"
 
 const Requests = CH.table(
 	"requests",

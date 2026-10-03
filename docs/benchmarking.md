@@ -1,6 +1,6 @@
 # Benchmarking ClickHouse queries
 
-The package ships a driver-free `@maple-dev/effect-clickhouse/benchmark` API,
+The package ships a driver-free `@maple-dev/effect-orm/benchmark` API,
 an HTTP adapter at `/benchmark/http`, and the `ch-bench` executable. The builder's
 root import still does no networking. No Maple account or schema is required.
 
@@ -36,9 +36,9 @@ it does not create a dataset or determine whether your query inputs are represen
 ## Define a workload
 
 ```ts title="benchmark-suite.ts"
-import { compile, from, param, table } from "@maple-dev/effect-clickhouse"
-import { uint32, string } from "@maple-dev/effect-clickhouse/types"
-import * as Bench from "@maple-dev/effect-clickhouse/benchmark"
+import { compile, from, param, table } from "@maple-dev/effect-orm"
+import { uint32, string } from "@maple-dev/effect-orm/types"
+import * as Bench from "@maple-dev/effect-orm/benchmark"
 
 const events = table("events", { id: uint32, name: string })
 const byName = from(events)
@@ -178,12 +178,12 @@ Save this beside `benchmark-suite.ts` as `benchmark-runner.ts`, set the same
 
 ```ts title="benchmark-runner.ts"
 import { Effect } from "effect"
-import * as Bench from "@maple-dev/effect-clickhouse/benchmark"
+import * as Bench from "@maple-dev/effect-orm/benchmark"
 import {
 	httpConfigFromEnv,
 	makeHttpClient,
 	makeHttpTransport,
-} from "@maple-dev/effect-clickhouse/benchmark/http"
+} from "@maple-dev/effect-orm/benchmark/http"
 import suiteDefinition from "./benchmark-suite"
 
 const measurements = await Effect.runPromise(

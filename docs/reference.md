@@ -1,7 +1,7 @@
 # API reference
 
 Everything on this page is exported from the root entry point
-(`@maple-dev/effect-clickhouse`) unless marked otherwise.
+(`@maple-dev/effect-orm`) unless marked otherwise.
 
 ## Naming conventions
 
@@ -18,7 +18,7 @@ One exception, because it cannot be anything else:
 | `in_` / `notIn`  | —                  | `Expr` methods; `in` is reserved |
 
 Importing the kitchen-sink namespace
-(`import * as CH from "@maple-dev/effect-clickhouse/expr"`) gives you the raw underscored names
+(`import * as CH from "@maple-dev/effect-orm/expr"`) gives you the raw underscored names
 uniformly, which some codebases prefer for exactly this reason.
 
 ## What's only on a subpath
@@ -287,7 +287,7 @@ their full namespaced tag; `QueryBuilderDefect` remains a defect rather than a t
 
 ### `QueryBuilderError`
 
-Tag `"@maple-dev/effect-clickhouse/QueryBuilderError"`. Raised while compiling, and surfaced in
+Tag `"@maple-dev/effect-orm/QueryBuilderError"`. Raised while compiling, and surfaced in
 `compile`'s error channel (thrown by `compileUnsafe`).
 
 | `code`             | Cause                                                                    |
@@ -298,7 +298,7 @@ Tag `"@maple-dev/effect-clickhouse/QueryBuilderError"`. Raised while compiling, 
 
 ### `QueryBuilderDefect`
 
-Tag `"@maple-dev/effect-clickhouse/QueryBuilderDefect"`. A DSL misuse no runtime value can cause
+Tag `"@maple-dev/effect-orm/QueryBuilderDefect"`. A DSL misuse no runtime value can cause
 — a query with no `select()`, an `orderBy` entry that is not a tuple, a bad param name, a
 comparison called on a param marker. Always
 a defect: `compile` maps only `QueryBuilderError` into the error channel. See
@@ -306,11 +306,11 @@ a defect: `compile` maps only `QueryBuilderError` into the error channel. See
 
 ### `CompiledQueryEncodeError`
 
-Tag `"@maple-dev/effect-clickhouse/CompiledQueryEncodeError"`. Fails the `encodeRows` Effect
+Tag `"@maple-dev/effect-orm/CompiledQueryEncodeError"`. Fails the `encodeRows` Effect
 when a decoded row cannot be written back to its wire shape. Fields: `message`, `rowIndex`,
 `cause`.
 
 ### `CompiledQueryDecodeError`
 
-Tag `"@maple-dev/effect-clickhouse/CompiledQueryDecodeError"`. Fails the `decodeRows` /
+Tag `"@maple-dev/effect-orm/CompiledQueryDecodeError"`. Fails the `decodeRows` /
 `decodeFirstRow` Effect. Fields: `message`, `rowIndex`, `cause`.

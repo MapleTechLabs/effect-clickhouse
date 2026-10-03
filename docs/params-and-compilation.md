@@ -247,7 +247,7 @@ Two classes, and the line between them is what a runtime value can reach.
 `QueryBuilderError` describes a **value** the builder was handed and cannot turn into SQL. Code
 that assembles a query from a request body can hit every one of these with correct code and bad
 input, so `compile` puts them in the Effect error channel, catchable by the tag
-`"@maple-dev/effect-clickhouse/QueryBuilderError"`:
+`"@maple-dev/effect-orm/QueryBuilderError"`:
 
 | Code               | Cause                                                                    |
 | ------------------ | ------------------------------------------------------------------------ |
@@ -270,8 +270,8 @@ a required parameter and recovers only that typed builder failure; defects are n
 
 ```ts title="compile-errors.ts"
 import { Effect } from "effect"
-import * as CH from "@maple-dev/effect-clickhouse"
-import * as T from "@maple-dev/effect-clickhouse/types"
+import * as CH from "@maple-dev/effect-orm"
+import * as T from "@maple-dev/effect-orm/types"
 
 const Events = CH.table("events", { Name: T.string })
 const query = CH.from(Events)
@@ -281,7 +281,7 @@ const query = CH.from(Events)
 export const outcome = await Effect.runPromise(
 	CH.compile(query, {}).pipe(
 		Effect.map((compiled) => ({ ok: true as const, sql: compiled.sql })),
-		Effect.catchTag("@maple-dev/effect-clickhouse/QueryBuilderError", (error) =>
+		Effect.catchTag("@maple-dev/effect-orm/QueryBuilderError", (error) =>
 			Effect.succeed({ ok: false as const, code: error.code, message: error.message }),
 		),
 	),

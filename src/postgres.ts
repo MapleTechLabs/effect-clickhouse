@@ -1,4 +1,4 @@
-// @maple-dev/effect-clickhouse/postgres
+// @maple-dev/effect-orm/postgres
 //
 // Postgres for the same query builder. Build queries with the root entry
 // (`table`, `from`, `param`, `unionAll`, the shared operators); declare

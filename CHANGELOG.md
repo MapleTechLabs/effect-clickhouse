@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Rename the package to `@maple-dev/effect-orm` and the repository to `MapleTechLabs/effect-orm`.
+  Imports, error `_tag` prefixes (`@maple-dev/effect-orm/QueryBuilderError`, ...) and the live-test
+  variables (`EFFECT_ORM_CLICKHOUSE_URL`, `_USER`, `_PASSWORD`) change with it.
 - Add `Dialect`: how a compiled query writes identifiers and literals, binds params, and
   which clauses exist. `compile` and friends take `options.dialect`; `clickhouseDialect` is the
   default and its output is unchanged.

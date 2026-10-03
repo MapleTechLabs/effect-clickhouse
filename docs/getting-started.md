@@ -13,7 +13,7 @@ The package declares `effect ^4.0.0` as a peer dependency; Effect 3 is incompati
 Install from npm with its Effect 4 peer dependency:
 
 ```sh
-npm install @maple-dev/effect-clickhouse "effect@^4.0.0"
+npm install @maple-dev/effect-orm "effect@^4.0.0"
 ```
 
 The recommended range accepts stable Effect 4 releases. It excludes Effect 3, the
@@ -23,8 +23,8 @@ version used to check these examples; it is not an installation pin.
 To build from source instead:
 
 ```sh
-git clone https://github.com/MapleTechLabs/effect-clickhouse.git
-cd effect-clickhouse
+git clone https://github.com/MapleTechLabs/effect-orm.git
+cd effect-orm
 bun install --frozen-lockfile
 bun run build
 bun pm pack
@@ -48,8 +48,8 @@ wire response; it does not need a server, credentials, or an existing table.
 
 ```ts title="quick-start.ts"
 import { Effect } from "effect"
-import * as CH from "@maple-dev/effect-clickhouse"
-import * as T from "@maple-dev/effect-clickhouse/types"
+import * as CH from "@maple-dev/effect-orm"
+import * as T from "@maple-dev/effect-orm/types"
 
 const Events = CH.table("events", {
 	Name: T.string,
@@ -106,8 +106,8 @@ when trying their query snippets. Their table and column names are case-sensitiv
 with your own database. Replace them with your real schema before executing.
 
 ```ts title="schema.ts"
-import * as CH from "@maple-dev/effect-clickhouse"
-import * as T from "@maple-dev/effect-clickhouse/types"
+import * as CH from "@maple-dev/effect-orm"
+import * as T from "@maple-dev/effect-orm/types"
 
 export const Events = CH.table(
 	"events",

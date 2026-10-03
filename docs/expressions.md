@@ -23,8 +23,8 @@ $.Timestamp.gte(new Date(...))            // Timestamp >= '2026-01-01 00:00:00'
 `isNull` (or `isNotNull` for present values), declared with `defineCondFn`:
 
 ```ts title="null-filter.ts"
-import * as CH from "@maple-dev/effect-clickhouse"
-import * as T from "@maple-dev/effect-clickhouse/types"
+import * as CH from "@maple-dev/effect-orm"
+import * as T from "@maple-dev/effect-orm/types"
 
 const Notes = CH.table("notes", { Note: T.nullable(T.string) })
 const isNull = CH.defineCondFn<[CH.Expr<string | null>]>("isNull")

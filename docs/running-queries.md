@@ -21,8 +21,8 @@ schema and writes no data. Set `CLICKHOUSE_URL`, `CLICKHOUSE_USERNAME`, and
 ```ts title="run-query.ts"
 import { ClickhouseClient } from "@effect/sql-clickhouse"
 import { Config, Effect, Redacted } from "effect"
-import * as CH from "@maple-dev/effect-clickhouse"
-import * as T from "@maple-dev/effect-clickhouse/types"
+import * as CH from "@maple-dev/effect-orm"
+import * as T from "@maple-dev/effect-orm/types"
 
 const ClickHouseLive = ClickhouseClient.layerConfig({
 	url: Config.String("CLICKHOUSE_URL").pipe(Config.withDefault("http://localhost:8123")),
@@ -110,7 +110,7 @@ example above does.
 When they have to travel _in the SQL_ — a gateway that forwards a statement verbatim, an endpoint that accepts one SQL string — the `/sql` subpath has the two functions for it:
 
 ```ts
-import { parseStatement, withSettings } from "@maple-dev/effect-clickhouse/sql"
+import { parseStatement, withSettings } from "@maple-dev/effect-orm/sql"
 
 const statement = withSettings(
 	parseStatement(compiled.sql),

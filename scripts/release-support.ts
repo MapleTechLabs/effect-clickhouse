@@ -2,12 +2,12 @@ import { Effect, Schema, Stream } from "effect"
 import { ChildProcess } from "effect/process"
 
 export class ReleaseCheckError extends Schema.TaggedError<ReleaseCheckError>()(
-	"@maple-dev/effect-clickhouse/ReleaseCheckError",
+	"@maple-dev/effect-orm/ReleaseCheckError",
 	{ message: Schema.String, check: Schema.String },
 ) {}
 
 export class CommandFailed extends Schema.TaggedError<CommandFailed>()(
-	"@maple-dev/effect-clickhouse/CommandFailed",
+	"@maple-dev/effect-orm/CommandFailed",
 	{
 		message: Schema.String,
 		command: Schema.String,

@@ -18,7 +18,7 @@ const program = Effect.gen(function* () {
 	const path = yield* Path.Path
 	const root = yield* path.fromFileUrl(new URL("..", import.meta.url))
 	// Outside the workspace, automatically removed on success, failure or Ctrl+C.
-	const temporary = yield* fs.makeTempDirectoryScoped({ prefix: "effect-clickhouse-consumer-" })
+	const temporary = yield* fs.makeTempDirectoryScoped({ prefix: "effect-orm-consumer-" })
 	const version = Effect.fn(function* (name: "effect" | "typescript" | "@types/node") {
 		const file = yield* path.fromFileUrl(new URL(import.meta.resolve(`${name}/package.json`)))
 		const text = yield* fs.readFileString(file)
@@ -48,7 +48,7 @@ const program = Effect.gen(function* () {
 			private: true,
 			type: "module",
 			dependencies: {
-				"@maple-dev/effect-clickhouse": `file:./${packed.filename}`,
+				"@maple-dev/effect-orm": `file:./${packed.filename}`,
 				effect: yield* version("effect"),
 			},
 			devDependencies: {

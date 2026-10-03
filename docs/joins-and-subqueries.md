@@ -145,7 +145,7 @@ That is what `subqueryExpr` is for. It takes the inner query, the column type it
 as, and a `wrap` function that receives the inner SQL and returns the expression text:
 
 ```ts
-import { subqueryCond, subqueryExpr } from "@maple-dev/effect-clickhouse"
+import { subqueryCond, subqueryExpr } from "@maple-dev/effect-orm"
 
 // Stage 1: a cheap scan reading only the sort column.
 const cheapScan = CH.from(Events)

@@ -3,8 +3,8 @@
 ## `table(name, columns)`
 
 ```ts
-import * as CH from "@maple-dev/effect-clickhouse"
-import * as T from "@maple-dev/effect-clickhouse/types"
+import * as CH from "@maple-dev/effect-orm"
+import * as T from "@maple-dev/effect-orm/types"
 
 const Events = CH.table("events", {
 	OrgId: T.string,
@@ -83,7 +83,7 @@ through nullable and array wrappers. Custom codecs retain their declared encodin
 provide an explicit result schema when different custom transforms need a particular encoding.
 
 > **Import the namespace.** Every constructor is on the root barrel too, but
-> `import * as T from "@maple-dev/effect-clickhouse/types"` — as above — reads better than
+> `import * as T from "@maple-dev/effect-orm/types"` — as above — reads better than
 > `CH.string` and keeps column types visually distinct from the query DSL.
 
 _(Backed by `docs/tables-and-types.md > Column types come from /types as a namespace`.)_
@@ -94,7 +94,7 @@ _(Backed by `docs/tables-and-types.md > Column types come from /types as a names
 `select` already infers output rows — but it is exported for writing your own helpers:
 
 ```ts
-import type { InferTS } from "@maple-dev/effect-clickhouse"
+import type { InferTS } from "@maple-dev/effect-orm"
 
 type Ms = InferTS<typeof T.uint64> // number
 ```

@@ -39,7 +39,7 @@ jobs:
             - run: bun install --frozen-lockfile
             - name: Check package, types, unit tests and live dialect
               env:
-                  EFFECT_CLICKHOUSE_TEST_URL: http://127.0.0.1:8123
-                  EFFECT_CLICKHOUSE_TEST_USER: maple
-                  EFFECT_CLICKHOUSE_TEST_PASSWORD: maple
+                  EFFECT_ORM_CLICKHOUSE_URL: http://127.0.0.1:8123
+                  EFFECT_ORM_CLICKHOUSE_USER: maple
+                  EFFECT_ORM_CLICKHOUSE_PASSWORD: maple
               run: bun run test:release

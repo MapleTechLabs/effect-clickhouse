@@ -46,7 +46,7 @@ try {
 		`
 import assert from "node:assert/strict"
 import { Effect } from "effect"
-import * as CH from "@maple-dev/effect-clickhouse"
+import * as CH from "@maple-dev/effect-orm"
 import { Events } from "./schema"
 const sql = (query: { sql: string }) => query.sql.replace(/\\s+/g, " ").trim()
 const quick = await import("./quick-start")
@@ -98,7 +98,7 @@ const nullFilter = await import("./null-filter")
 assert.match(sql(nullFilter.compiled), /WHERE isNull\\(notes.Note\\)/)
 assert.deepEqual(await Effect.runPromise(nullFilter.compiled.decodeRows([{ Note: null }])), [{ Note: null }])
 const escapedSql = await import("./escaped-sql")
-const fragments = await import("@maple-dev/effect-clickhouse/sql")
+const fragments = await import("@maple-dev/effect-orm/sql")
 assert.equal(escapedSql.predicate, "Name = " + fragments.compile(fragments.str("O'Reilly")))
 assert.doesNotMatch(escapedSql.predicate, /\\[object Object\\]/)
 const postgres = await import("./postgres-quickstart")

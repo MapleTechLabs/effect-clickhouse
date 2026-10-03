@@ -514,7 +514,7 @@ describe("compile puts failures in the error channel", () => {
 	it.effect("a missing param value is a typed failure", () =>
 		Effect.gen(function* () {
 			const error = yield* Effect.flip(CH.compile(query, {}))
-			expect(error._tag).toBe("@maple-dev/effect-clickhouse/QueryBuilderError")
+			expect(error._tag).toBe("@maple-dev/effect-orm/QueryBuilderError")
 			expect(error.code).toBe("UnresolvedParam")
 			expect(error.message).toContain("orgId")
 		}),
@@ -599,7 +599,7 @@ const expectDefect = (exit: Exit.Exit<unknown, unknown>) => {
 	const defect = Exit.isFailure(exit) ? Cause.findDefect(exit.cause) : undefined
 	expect(
 		defect && Result.isSuccess(defect) ? (defect.success as CH.QueryBuilderDefect)._tag : undefined,
-	).toBe("@maple-dev/effect-clickhouse/QueryBuilderDefect")
+	).toBe("@maple-dev/effect-orm/QueryBuilderDefect")
 }
 
 // Failures vs defects — the rule is on `QueryBuilderError` in ./errors.

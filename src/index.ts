@@ -1,4 +1,4 @@
-// @maple-dev/effect-clickhouse — curated public API
+// @maple-dev/effect-orm — curated public API
 //
 // A type-safe, immutable ClickHouse SQL query builder. The main entry point
 // re-exports the DSL under friendly names. For the raw ClickHouse function

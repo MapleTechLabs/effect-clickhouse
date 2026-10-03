@@ -7,7 +7,7 @@ const Metric = Schema.NullOr(NonNegative)
 const Text = Schema.String.check(Schema.isMinLength(1))
 
 export class BenchmarkError extends Schema.TaggedError<BenchmarkError>()(
-	"@maple-dev/effect-clickhouse/BenchmarkError",
+	"@maple-dev/effect-orm/BenchmarkError",
 	{ message: Schema.String, queryId: Schema.optionalKey(Schema.String) },
 ) {}
 

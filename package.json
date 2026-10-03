@@ -1,23 +1,25 @@
 {
-	"name": "@maple-dev/effect-clickhouse",
+	"name": "@maple-dev/effect-orm",
 	"version": "0.2.0",
-	"description": "Type-safe ClickHouse queries, result decoding, and reproducible benchmarks for Effect and TypeScript",
+	"description": "Type-safe ClickHouse and Postgres queries, result decoding, and reproducible benchmarks for Effect and TypeScript",
 	"keywords": [
 		"clickhouse",
 		"effect",
+		"orm",
+		"postgres",
 		"query-builder",
 		"sql",
 		"typescript"
 	],
 	"homepage": "https://effect-clickhouse.maple.dev",
 	"bugs": {
-		"url": "https://github.com/MapleTechLabs/effect-clickhouse/issues"
+		"url": "https://github.com/MapleTechLabs/effect-orm/issues"
 	},
 	"license": "MIT",
 	"author": "Makisuo, Inc.",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/MapleTechLabs/effect-clickhouse.git"
+		"url": "git+https://github.com/MapleTechLabs/effect-orm.git"
 	},
 	"bin": {
 		"ch-bench": "./dist/benchmark/bin.mjs"

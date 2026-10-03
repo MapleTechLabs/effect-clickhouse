@@ -74,8 +74,8 @@ _(Backed by `docs/extending.md > defineCondFn declares a predicate`.)_
 When the signature is too irregular for `defineFn`, write the wrapper yourself:
 
 ```ts title="typed-function.ts"
-import * as CH from "@maple-dev/effect-clickhouse"
-import * as T from "@maple-dev/effect-clickhouse/types"
+import * as CH from "@maple-dev/effect-orm"
+import * as T from "@maple-dev/effect-orm/types"
 
 const greatestOf = (first: CH.Expr<number>, ...rest: CH.Expr<number>[]) =>
 	CH.compileTypedFnCall<number>("greatest", T.float64.schema, first, ...rest)
@@ -101,8 +101,8 @@ For functions whose call syntax is not `fn(a, b)` at all — parametric aggregat
 anything bespoke:
 
 ```ts
-import { makeExpr } from "@maple-dev/effect-clickhouse"
-import { raw, compile } from "@maple-dev/effect-clickhouse/sql"
+import { makeExpr } from "@maple-dev/effect-orm"
+import { raw, compile } from "@maple-dev/effect-orm/sql"
 
 const quantileExact = (q: number) => (expr: CH.Expr<number>) =>
 	makeExpr<number>(raw(`quantileExact(${q})(${compile(expr.toFragment())})`), T.float64.schema)
@@ -119,7 +119,7 @@ user-supplied string values through `compile(str(value))` from the `/sql` subpat
 produces `[object Object]`. For example:
 
 ```ts title="escaped-sql.ts"
-import { compile, str } from "@maple-dev/effect-clickhouse/sql"
+import { compile, str } from "@maple-dev/effect-orm/sql"
 
 export const predicate = `Name = ${compile(str("O'Reilly"))}`
 console.log(predicate) // Name = 'O\'Reilly'
@@ -231,7 +231,7 @@ _(Backed by `docs/extending.md > rawCompiledQuery wraps handwritten SQL`.)_
 The `/sql` subpath exposes the layer everything above is built on:
 
 ```ts
-import { raw, str, ident, int, join, as_, when, compile } from "@maple-dev/effect-clickhouse/sql"
+import { raw, str, ident, int, join, as_, when, compile } from "@maple-dev/effect-orm/sql"
 ```
 
 - `str(value)` — an escaped string literal. **Use this for anything user-supplied.**

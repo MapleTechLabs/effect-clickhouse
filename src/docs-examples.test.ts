@@ -619,7 +619,7 @@ describe("docs/decoding-results.md", () => {
 		Effect.gen(function* () {
 			const result = yield* Effect.flip(compiled().decodeRows([{ name: 42, count: 1 }]))
 
-			expect(result._tag).toBe("@maple-dev/effect-clickhouse/CompiledQueryDecodeError")
+			expect(result._tag).toBe("@maple-dev/effect-orm/CompiledQueryDecodeError")
 			expect(result.rowIndex).toBe(0)
 		}),
 	)
